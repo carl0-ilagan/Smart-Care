@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bell, Lock, Shield, Calendar, Clock, Monitor, Smartphone, Globe, LogOut } from "lucide-react"
-import { SaveConfirmationModal } from "@/components/save-confirmation-modal"
+import { Lock, Shield, Calendar, Clock, Monitor, Smartphone, Globe, LogOut } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -31,12 +30,16 @@ export default function DoctorSettingsPage() {
       sessionTimeout: "30",
     },
   })
-  const [showSaveModal, setShowSaveModal] = useState(false)
+  // Auto-save; no manual save modal/button
   const [notification, setNotification] = useState({ show: false, message: "", type: "success" })
   const [loading, setLoading] = useState(true)
   const [saveLoading, setSaveLoading] = useState(false)
   const [sessions, setSessions] = useState([])
   const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [confirmRevokeId, setConfirmRevokeId] = useState(null)
+  const [confirmRevokeAllOpen, setConfirmRevokeAllOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 5
 
   // Fetch user settings from Firestore
   useEffect(() => {
@@ -218,31 +221,28 @@ export default function DoctorSettingsPage() {
     }
   }
 
-  const handleSaveSettings = async () => {
+  // Auto-save settings with debounce, after initial load
+  useEffect(() => {
     if (!user) return
-
-    try {
-      setSaveLoading(true)
-      await setDoc(
-        doc(db, "userSettings", user.uid),
-        {
-          ...settings,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      )
-      setShowSaveModal(true)
-    } catch (error) {
-      console.error("Error saving settings:", error)
-      setNotification({
-        show: true,
-        message: "Failed to save settings. Please try again.",
-        type: "error",
-      })
-    } finally {
-      setSaveLoading(false)
-    }
-  }
+    if (loading) return
+    const timer = setTimeout(async () => {
+      try {
+        setSaveLoading(true)
+        await setDoc(
+          doc(db, "userSettings", user.uid),
+          { ...settings, updatedAt: serverTimestamp() },
+          { merge: true },
+        )
+        setNotification({ show: true, message: "Settings updated", type: "success" })
+      } catch (e) {
+        console.error("Auto-save settings error:", e)
+        setNotification({ show: true, message: "Failed to update settings", type: "error" })
+      } finally {
+        setSaveLoading(false)
+      }
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [settings, user, loading])
 
   if (loading) {
     return (
@@ -265,93 +265,10 @@ export default function DoctorSettingsPage() {
       )}
 
       <div className="space-y-6">
-        {/* Notifications */}
-        <div className="rounded-lg border border-pale-stone bg-white p-6 shadow-sm">
-          <div className="flex items-center">
-            <Bell className="mr-2 h-5 w-5 text-amber-500" />
-            <h2 className="text-xl font-semibold text-graphite">Notifications</h2>
-          </div>
-          <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <label htmlFor="notify-appointments" className="text-sm text-graphite">
-                Appointment Notifications
-              </label>
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  id="notify-appointments"
-                  className="peer sr-only"
-                  checked={settings.notifications.appointments}
-                  onChange={() => handleNotificationChange("appointments")}
-                />
-                <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:ring-2 peer-focus:ring-amber-500"></div>
-              </label>
-            </div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="notify-messages" className="text-sm text-graphite">
-                New Messages
-              </label>
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  id="notify-messages"
-                  className="peer sr-only"
-                  checked={settings.notifications.messages}
-                  onChange={() => handleNotificationChange("messages")}
-                />
-                <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:ring-2 peer-focus:ring-amber-500"></div>
-              </label>
-            </div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="notify-prescriptions" className="text-sm text-graphite">
-                Prescription Updates
-              </label>
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  id="notify-prescriptions"
-                  className="peer sr-only"
-                  checked={settings.notifications.prescriptions}
-                  onChange={() => handleNotificationChange("prescriptions")}
-                />
-                <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:ring-2 peer-focus:ring-amber-500"></div>
-              </label>
-            </div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="notify-patientUpdates" className="text-sm text-graphite">
-                Patient Updates
-              </label>
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  id="notify-patientUpdates"
-                  className="peer sr-only"
-                  checked={settings.notifications.patientUpdates}
-                  onChange={() => handleNotificationChange("patientUpdates")}
-                />
-                <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:ring-2 peer-focus:ring-amber-500"></div>
-              </label>
-            </div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="notify-marketing" className="text-sm text-graphite">
-                Marketing & Promotions
-              </label>
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  id="notify-marketing"
-                  className="peer sr-only"
-                  checked={settings.notifications.marketing}
-                  onChange={() => handleNotificationChange("marketing")}
-                />
-                <div className="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:ring-2 peer-focus:ring-amber-500"></div>
-              </label>
-            </div>
-          </div>
-        </div>
+        {/* Notifications section removed per request */}
 
-        {/* Privacy */}
-        <div className="rounded-lg border border-pale-stone bg-white p-6 shadow-sm">
+        {/* Privacy removed per request */}
+        {false && <div className="rounded-lg border border-pale-stone bg-white p-6 shadow-sm">
           <div className="flex items-center">
             <Shield className="mr-2 h-5 w-5 text-amber-500" />
             <h2 className="text-xl font-semibold text-graphite">Privacy</h2>
@@ -414,10 +331,10 @@ export default function DoctorSettingsPage() {
               </label>
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Security */}
-        <div className="rounded-lg border border-pale-stone bg-white p-6 shadow-sm">
+      <div className="rounded-lg border border-pale-stone bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md">
           <div className="flex items-center">
             <Lock className="mr-2 h-5 w-5 text-amber-500" />
             <h2 className="text-xl font-semibold text-graphite">Security</h2>
@@ -468,7 +385,7 @@ export default function DoctorSettingsPage() {
                 id="session-timeout"
                 value={settings.security.sessionTimeout}
                 onChange={(e) => handleSecurityChange("sessionTimeout", e.target.value)}
-                className="w-full max-w-xs rounded-md border border-earth-beige bg-white py-2 pl-3 pr-10 text-graphite focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              className="w-full max-w-xs rounded-md border border-earth-beige bg-white py-2 pl-3 pr-10 text-graphite focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all duration-200 hover:shadow-sm"
               >
                 <option value="15">15 minutes</option>
                 <option value="30">30 minutes</option>
@@ -485,7 +402,7 @@ export default function DoctorSettingsPage() {
 
               <div className="mb-4">
                 <button
-                  onClick={handleRevokeAllOtherSessions}
+                  onClick={() => setConfirmRevokeAllOpen(true)}
                   disabled={sessionsLoading || sessions.filter((s) => !s.isCurrentSession).length === 0}
                   className={`px-3 py-1 text-sm rounded-md bg-red-100 text-red-700 hover:bg-red-200 ${
                     sessionsLoading || sessions.filter((s) => !s.isCurrentSession).length === 0
@@ -503,7 +420,9 @@ export default function DoctorSettingsPage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {sessions.map((session) => (
+                  {sessions
+                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                    .map((session) => (
                     <div
                       key={session.id}
                       className={`p-3 rounded-md flex justify-between items-center ${
@@ -541,7 +460,7 @@ export default function DoctorSettingsPage() {
                       </div>
                       {!session.isCurrentSession && (
                         <button
-                          onClick={() => handleRevokeSession(session.id)}
+                          onClick={() => setConfirmRevokeId(session.id)}
                           className="flex items-center text-red-500 hover:text-red-600 text-sm"
                           disabled={sessionsLoading}
                         >
@@ -555,6 +474,29 @@ export default function DoctorSettingsPage() {
                   {sessions.length === 0 && (
                     <div className="text-center py-4 text-drift-gray">No active sessions found</div>
                   )}
+
+                  {/* Pagination */}
+                  {sessions.length > pageSize && (
+                    <div className="flex justify-end items-center gap-2 pt-2">
+                      <button
+                        className="px-2 py-1 text-sm rounded border border-earth-beige disabled:opacity-50"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm text-drift-gray">
+                        Page {currentPage} of {Math.ceil(sessions.length / pageSize)}
+                      </span>
+                      <button
+                        className="px-2 py-1 text-sm rounded border border-earth-beige disabled:opacity-50"
+                        onClick={() => setCurrentPage((p) => Math.min(Math.ceil(sessions.length / pageSize), p + 1))}
+                        disabled={currentPage >= Math.ceil(sessions.length / pageSize)}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -567,31 +509,83 @@ export default function DoctorSettingsPage() {
           </div>
         </div>
 
-        {/* Save Button */}
-        <div className="flex justify-end">
-          <button
-            onClick={handleSaveSettings}
-            disabled={saveLoading}
-            className="rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50"
-          >
-            {saveLoading ? (
-              <>
-                <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                Saving...
-              </>
-            ) : (
-              "Save Settings"
-            )}
-          </button>
-        </div>
+        {/* Auto-save active; save button removed */}
       </div>
 
-      <SaveConfirmationModal
-        isOpen={showSaveModal}
-        onClose={() => setShowSaveModal(false)}
-        title="Settings Saved"
-        message="Your settings have been successfully updated."
-      />
+      {/* Save confirmation modal removed */}
+
+      {/* Confirm revoke single - match AppointmentModal styling */}
+      {confirmRevokeId && (
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-3 bg-black/60 backdrop-blur-xl animate-fade-in`}>
+          <div className={`w-full max-w-md mx-auto rounded-2xl shadow-2xl overflow-hidden flex flex-col bg-gradient-to-br from-soft-amber/10 to-yellow-50 animate-modal-in`}>
+            <div className="p-3 border-b border-amber-200/40">
+              <h4 className="text-base font-bold text-graphite text-center">Revoke Session</h4>
+            </div>
+            <div className="p-4 bg-white">
+              <p className="text-sm text-drift-gray">This action cannot be undone. Do you want to revoke this session?</p>
+            </div>
+            <div className="p-3 border-t border-amber-200/30 bg-white">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                <button
+                  type="button"
+                  className="flex-1 sm:flex-none rounded-lg border-2 border-soft-amber/60 bg-white px-4 py-2 text-sm font-semibold text-soft-amber shadow-sm hover:bg-soft-amber/10 hover:border-soft-amber hover:shadow-md focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
+                  onClick={() => setConfirmRevokeId(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 sm:flex-none rounded-lg px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-soft-amber to-amber-500 shadow-lg hover:from-amber-500 hover:to-amber-600 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2 disabled:opacity-70"
+                  disabled={sessionsLoading}
+                  onClick={async () => {
+                    const id = confirmRevokeId
+                    setConfirmRevokeId(null)
+                    await handleRevokeSession(id)
+                  }}
+                >
+                  Revoke
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm revoke all - match AppointmentModal styling */}
+      {confirmRevokeAllOpen && (
+        <div className={`fixed inset-0 z-[100] flex items-center justify-center p-3 bg-black/60 backdrop-blur-xl animate-fade-in`}>
+          <div className={`w-full max-w-md mx-auto rounded-2xl shadow-2xl overflow-hidden flex flex-col bg-gradient-to-br from-soft-amber/10 to-yellow-50 animate-modal-in`}>
+            <div className="p-3 border-b border-amber-200/40">
+              <h4 className="text-base font-bold text-graphite text-center">Revoke All Other Sessions</h4>
+            </div>
+            <div className="p-4 bg-white">
+              <p className="text-sm text-drift-gray">This action cannot be undone. Do you want to revoke all other sessions?</p>
+            </div>
+            <div className="p-3 border-t border-amber-200/30 bg-white">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                <button
+                  type="button"
+                  className="flex-1 sm:flex-none rounded-lg border-2 border-soft-amber/60 bg-white px-4 py-2 text-sm font-semibold text-soft-amber shadow-sm hover:bg-soft-amber/10 hover:border-soft-amber hover:shadow-md focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
+                  onClick={() => setConfirmRevokeAllOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 sm:flex-none rounded-lg px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-soft-amber to-amber-500 shadow-lg hover:from-amber-500 hover:to-amber-600 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2 disabled:opacity-70"
+                  disabled={sessionsLoading || sessions.filter((s) => !s.isCurrentSession).length === 0}
+                  onClick={async () => {
+                    setConfirmRevokeAllOpen(false)
+                    await handleRevokeAllOtherSessions()
+                  }}
+                >
+                  Revoke All
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

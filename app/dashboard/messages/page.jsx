@@ -8,10 +8,8 @@ import {
   Filter,
   Info,
   MessageSquare,
-  Phone,
   Search,
   User,
-  Video,
   X,
   Plus,
   Loader2,
@@ -48,8 +46,7 @@ import ConversationOptionsMenu from "@/components/conversation-options-menu"
 import MessageDisplay from "@/components/message-display"
 import MessageInput from "@/components/message-input"
 import DeleteConversationModal from "@/components/delete-conversation-modal"
-import { createCall } from "@/lib/call-utils"
-import CallNotification from "@/components/call-notification"
+// Call features removed per requirements
 import ProfileImage from "@/components/profile-image"
 
 export default function MessagesPage() {
@@ -678,37 +675,7 @@ export default function MessagesPage() {
     else return (bytes / 1073741824).toFixed(1) + " GB"
   }
 
-  // Handle video call
-  const handleVideoCall = async () => {
-    if (selectedConversation && doctorDetails) {
-      try {
-        // Create a new call
-        const callId = await createCall(user.uid, doctorDetails.id, "video", selectedConversation.id)
-        if (callId) {
-          router.push(`/dashboard/calls/video/${callId}`)
-        }
-      } catch (error) {
-        console.error("Error starting video call:", error)
-        alert("Could not start video call. Please try again.")
-      }
-    }
-  }
-
-  // Handle voice call
-  const handleVoiceCall = async () => {
-    if (selectedConversation && doctorDetails) {
-      try {
-        // Create a new call
-        const callId = await createCall(user.uid, doctorDetails.id, "voice", selectedConversation.id)
-        if (callId) {
-          router.push(`/dashboard/calls/voice/${callId}`)
-        }
-      } catch (error) {
-        console.error("Error starting voice call:", error)
-        alert("Could not start voice call. Please try again.")
-      }
-    }
-  }
+  // Call features removed per requirements
 
   // Handle new conversation created
   const handleConversationCreated = (conversationId) => {
@@ -923,20 +890,6 @@ export default function MessagesPage() {
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleVoiceCall}
-                className="rounded-full bg-pale-stone p-2 text-drift-gray hover:bg-soft-amber hover:text-white"
-                title="Voice Call"
-              >
-                <Phone className="h-5 w-5" />
-              </button>
-              <button
-                onClick={handleVideoCall}
-                className="rounded-full bg-pale-stone p-2 text-drift-gray hover:bg-soft-amber hover:text-white"
-                title="Video Call"
-              >
-                <Video className="h-5 w-5" />
-              </button>
-              <button
                 onClick={() => setShowDoctorInfo(true)}
                 className="rounded-full bg-pale-stone p-2 text-drift-gray hover:bg-soft-amber hover:text-white"
                 title="Doctor Information"
@@ -1062,30 +1015,32 @@ export default function MessagesPage() {
             )}
           </div>
 
-          {/* Message Input */}
-          <MessageInput
-            value={newMessage}
-            onChange={setNewMessage}
-            onSend={handleSendMessage}
-            onFileSelect={(fileData) => {
-              setSelectedFile(fileData.file)
-              if (fileData.fileData) {
-                // If fileData is provided (from voice recorder or camera)
-                setSelectedFile({
-                  ...fileData.file,
-                  fileData: fileData.fileData,
-                })
-              }
-            }}
-            selectedFile={selectedFile}
-            onRemoveFile={handleRemoveFile}
-            fileError={fileError}
-            sendingMessage={sendingMessage}
-            replyingTo={replyingTo}
-            onCancelReply={handleCancelReply}
-            onTyping={handleTyping}
-            otherUserName={doctorDetails?.displayName}
-          />
+          {/* Message Input (fixed at bottom; only messages scroll) */}
+          <div className="shrink-0 sticky bottom-0 bg-white border-t border-pale-stone p-2">
+            <MessageInput
+              value={newMessage}
+              onChange={setNewMessage}
+              onSend={handleSendMessage}
+              onFileSelect={(fileData) => {
+                setSelectedFile(fileData.file)
+                if (fileData.fileData) {
+                  // If fileData is provided (from voice recorder or camera)
+                  setSelectedFile({
+                    ...fileData.file,
+                    fileData: fileData.fileData,
+                  })
+                }
+              }}
+              selectedFile={selectedFile}
+              onRemoveFile={handleRemoveFile}
+              fileError={fileError}
+              sendingMessage={sendingMessage}
+              replyingTo={replyingTo}
+              onCancelReply={handleCancelReply}
+              onTyping={handleTyping}
+              otherUserName={doctorDetails?.displayName}
+            />
+          </div>
         </>
       ) : (
         <div className="flex h-full items-center justify-center p-4">
@@ -1210,8 +1165,7 @@ export default function MessagesPage() {
         onClose={() => setShowNewConversationModal(false)}
         onConversationCreated={handleConversationCreated}
       />
-      {/* Call Notification */}
-      <CallNotification />
+      {/* Call Notification removed */}
     </div>
   )
 }

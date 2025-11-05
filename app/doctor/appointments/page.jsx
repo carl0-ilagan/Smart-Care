@@ -14,12 +14,15 @@ import {
   FileText,
   CheckCircle2,
   Video,
+  Globe,
+  MapPin,
+  Ban,
 } from "lucide-react"
 import { AppointmentModal } from "@/components/appointment-modal"
+import { CreateRoomModal } from "@/components/create-room-modal"
 import { AppointmentDetailsModal } from "@/components/appointment-details-modal"
 import { CancelAppointmentModal } from "@/components/cancel-appointment-modal"
 import { AppointmentSummaryModal } from "@/components/appointment-summary-modal"
-import { RescheduleModal } from "@/components/reschedule-modal"
 import { SuccessNotification } from "@/components/success-notification"
 import { AppointmentApprovalModal } from "@/components/appointment-approval-modal"
 import { useAuth } from "@/contexts/auth-context"
@@ -27,32 +30,51 @@ import {
   getUserAppointments,
   getAvailablePatients,
   batchCheckAppointmentStatus,
-  isEligibleForVideoCall,
   hasSummary,
 } from "@/lib/appointment-utils"
 import Link from "next/link"
 import { AppointmentAddSummaryModal } from "@/components/appointment-add-summary-modal"
 import ProfileImage from "@/components/profile-image"
 import PaginationControls from "@/components/pagination-controls"
+import { NotificationListener } from "@/components/notification-listener"
+import { DashboardHeaderBanner } from "@/components/dashboard-header-banner"
+import { db } from "@/lib/firebase"
+import { collection, query, where, onSnapshot } from "firebase/firestore"
 
 export default function DoctorAppointmentsPage() {
   const { user } = useAuth()
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false)
+  const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterPatient, setFilterPatient] = useState("all")
+  const [filterType, setFilterType] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState("list") // 'list' or 'grid'
+  const [viewMode, setViewMode] = useState("grid") // 'list' or 'grid' - default to grid
+  const [isPWA, setIsPWA] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [appointmentsPerPage] = useState(8)
+  const [appointmentsPerPage] = useState(10) // 10 data per page
+  // Helper: check if given ISO date string is today
+  const isToday = (dateStr) => {
+    try {
+      const d = new Date(dateStr)
+      const now = new Date()
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      )
+    } catch {
+      return false
+    }
+  }
 
   // Modal states
   const [selectedAppointment, setSelectedAppointment] = useState(null)
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false)
-  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false)
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false)
   const [isAddSummaryModalOpen, setIsAddSummaryModalOpen] = useState(false)
 
@@ -62,6 +84,9 @@ export default function DoctorAppointmentsPage() {
   // Patients and appointments state
   const [patients, setPatients] = useState([])
   const [appointments, setAppointments] = useState([])
+  
+  // Track room IDs for appointments - maps appointmentId -> roomId
+  const [appointmentRoomIds, setAppointmentRoomIds] = useState({})
 
   // Load patients and appointments from Firebase
   useEffect(() => {
@@ -110,6 +135,32 @@ export default function DoctorAppointmentsPage() {
     }
   }, [user])
 
+  // Detect PWA (standalone) to adjust list styling
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+      const iosStandalone = window.navigator.standalone === true
+      setIsPWA(Boolean(standalone || iosStandalone))
+    } catch {}
+  }, [])
+
+  // Show toast if redirected from ended room
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const toast = params.get("toast")
+      if (toast === "room_ended_doctor") {
+        setNotification({ message: "The call is already ended.", isVisible: true })
+        // Clean URL
+        const url = new URL(window.location.href)
+        url.searchParams.delete("toast")
+        window.history.replaceState({}, "", url.toString())
+      }
+    } catch {}
+  }, [])
+
   useEffect(() => {
     if (!appointments.length) return
 
@@ -148,6 +199,55 @@ export default function DoctorAppointmentsPage() {
     return () => clearInterval(intervalId)
   }, [appointments])
 
+  // Listen for rooms where doctor created and invited a patient (for appointments)
+  useEffect(() => {
+    if (!user?.uid) return
+
+    // Listen for rooms where this doctor is the caller
+    const roomsQuery = query(
+      collection(db, "calls"),
+      where("callerId", "==", user.uid),
+      where("type", "==", "video")
+    )
+
+    const unsubscribe = onSnapshot(roomsQuery, (snapshot) => {
+      const roomMap = {}
+      
+      snapshot.forEach((doc) => {
+        const roomData = doc.data()
+        const roomId = doc.id
+        
+        // Only show Join Room button when:
+        // 1. Room has appointmentId (doctor created room for specific appointment)
+        // 2. Patient is invited (receiverId is set AND not null/empty)
+        // 3. Room status is pending or active
+        if (
+          roomData.appointmentId && // Must have appointmentId - doctor must create room for appointment
+          roomData.receiverId &&
+          typeof roomData.receiverId === "string" &&
+          roomData.receiverId.trim() !== "" &&
+          (roomData.status === "pending" || roomData.status === "active")
+        ) {
+          // Verify appointmentId matches an existing appointment with correct patient and doctor
+          const matchingAppointment = appointments.find(
+            (apt) =>
+              apt.id === roomData.appointmentId &&
+              apt.patientId === roomData.receiverId &&
+              apt.doctorId === roomData.callerId
+          )
+          
+          if (matchingAppointment) {
+            roomMap[roomData.appointmentId] = roomId
+          }
+        }
+      })
+      
+      setAppointmentRoomIds(roomMap)
+    })
+
+    return () => unsubscribe()
+  }, [user?.uid, appointments])
+
   // Filter appointments
   const filteredAppointments = appointments
     .filter((appointment) => {
@@ -163,7 +263,10 @@ export default function DoctorAppointmentsPage() {
       // Filter by patient
       const matchesPatient = filterPatient === "all" || appointment.patientId === filterPatient
 
-      return matchesSearch && matchesStatus && matchesPatient
+      // Filter by type
+      const matchesType = filterType === "all" || appointment.type === filterType
+
+      return matchesSearch && matchesStatus && matchesPatient && matchesType
     })
     .sort((a, b) => {
       // Sort by date (most recent first for completed, soonest first for upcoming)
@@ -188,7 +291,25 @@ export default function DoctorAppointmentsPage() {
       }
     })
 
-  // Calculate pagination
+  // Get unique appointment types for filter - include all possible types
+  const allPossibleTypes = [
+    "Initial Visit",
+    "Follow-up",
+    "Consultation",
+    "Annual Physical",
+    "Urgent Care",
+    "Specialist Referral",
+  ]
+  const existingTypes = [...new Set(appointments.map((a) => a.type).filter(Boolean))]
+  // Merge existing types with all possible types, remove duplicates
+  const appointmentTypes = [...new Set([...allPossibleTypes, ...existingTypes])].sort()
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterStatus, filterPatient, filterType, searchTerm])
+
+  // Calculate pagination - always paginate with 10 items per page
   const indexOfLastAppointment = currentPage * appointmentsPerPage
   const indexOfFirstAppointment = indexOfLastAppointment - appointmentsPerPage
   const totalPages = Math.ceil(filteredAppointments.length / appointmentsPerPage)
@@ -252,40 +373,24 @@ export default function DoctorAppointmentsPage() {
     setIsSummaryModalOpen(true)
   }
 
-  // Handle reschedule
-  const handleReschedule = (appointment) => {
-    setSelectedAppointment(appointment)
-    setIsRescheduleModalOpen(true)
-  }
-
-  // Confirm reschedule
-  const confirmReschedule = (updatedAppointment) => {
-    // Update the appointment in the local state
-    if (updatedAppointment && updatedAppointment.id) {
-      setAppointments((prevAppointments) =>
-        prevAppointments.map((apt) => (apt.id === updatedAppointment.id ? updatedAppointment : apt)),
-      )
-    }
-
-    // Close the reschedule modal
-    setIsRescheduleModalOpen(false)
-
-    // Show success notification
-    setNotification({
-      message: "Appointment rescheduled successfully",
-      isVisible: true,
-    })
-  }
 
   // Handle booking a new appointment
   const handleBookAppointment = (newAppointment) => {
     // Close the appointment modal
     setIsAppointmentModalOpen(false)
 
-    // Show success notification
+    // Show enhanced success notification with appointment details
+    const appointmentDate = new Date(newAppointment.date).toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })
+    
     setNotification({
-      message: "Appointment scheduled successfully",
+      message: `✅ Appointment successfully scheduled with ${newAppointment.patientName} on ${appointmentDate} at ${newAppointment.time}. Patient has been notified via email and in-app notification.`,
       isVisible: true,
+      type: "success",
     })
   }
 
@@ -294,6 +399,7 @@ export default function DoctorAppointmentsPage() {
     setSearchTerm("")
     setFilterStatus("all")
     setFilterPatient("all")
+    setFilterType("all")
   }
 
   // Toggle view mode between list and grid
@@ -301,30 +407,57 @@ export default function DoctorAppointmentsPage() {
     setViewMode(viewMode === "list" ? "grid" : "list")
   }
 
+  // Get gradient class based on status - shared function
+  const getGradientClass = (status) => {
+    const isPending = status === "pending"
+    const isApproved = status === "approved"
+    const isCompleted = status === "completed"
+    const isCancelled = status === "cancelled"
+
+    if (isPending) return "from-amber-50 to-amber-100/50"
+    if (isApproved) return "from-green-50 to-emerald-100/50"
+    if (isCompleted) return "from-blue-50 to-sky-100/50"
+    if (isCancelled) return "from-red-50 to-rose-100/50"
+    return "from-gray-50 to-gray-100/50"
+  }
+
   // Get status badge for appointment
   const getStatusBadge = (status) => {
     switch (status) {
       case "pending":
         return (
-          <span className="ml-2 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+          <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-100 to-amber-50 border border-amber-300 px-3 py-1 text-xs font-bold text-amber-800 shadow-sm">
+            <Clock className="h-3 w-3" />
             Pending
           </span>
         )
       case "approved":
         return (
-          <span className="ml-2 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-            Approved
+          <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-green-100 to-emerald-50 border border-green-300 px-3 py-1 text-xs font-bold text-green-800 shadow-sm">
+            <CheckCircle2 className="h-3 w-3" />
+            Confirmed
           </span>
         )
       case "completed":
         return (
-          <span className="ml-2 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+          <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-blue-100 to-sky-50 border border-blue-300 px-3 py-1 text-xs font-bold text-blue-800 shadow-sm">
+            <FileText className="h-3 w-3" />
             Completed
           </span>
         )
       case "cancelled":
         return (
-          <span className="ml-2 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">Cancelled</span>
+          <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-red-100 to-rose-50 border border-red-300 px-3 py-1 text-xs font-bold text-red-800 shadow-sm">
+            <X className="h-3 w-3" />
+            Cancelled
+          </span>
+        )
+      case "declined":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-100 to-amber-50 border border-amber-300 px-3 py-1 text-xs font-bold text-amber-800 shadow-sm">
+            <X className="h-3 w-3" />
+            Declined
+          </span>
         )
       default:
         return null
@@ -372,440 +505,677 @@ export default function DoctorAppointmentsPage() {
     })
   }
 
-  // Update the renderListAppointment function to include the Join Call button only for eligible appointments
+  // Render appointment in list view - matching patient side style
   const renderListAppointment = (appointment, index) => {
     const isCompleted = appointment.status === "completed"
-    const isCancelled = appointment.status === "cancelled"
-    const isPending = appointment.status === "pending"
-
-    // Check if appointment is eligible for video call
-    const canJoinCall = isEligibleForVideoCall(appointment, "doctor")
-
-    // Get first letter of patient name for fallback
-    const patientInitial = appointment.patientName ? appointment.patientName.charAt(0).toUpperCase() : "P"
-
-    return (
-      <div
-        key={appointment.id}
-        className={`group overflow-hidden rounded-lg border-l-4 ${getBorderColorClass(appointment.status)} border border-pale-stone bg-white p-4 shadow-sm transition-all hover:shadow-md hover:border-amber-500/30 ${
-          isCompleted ? "opacity-80 hover:opacity-100" : ""
-        } ${isCancelled ? "opacity-70 hover:opacity-90" : ""}`}
-        style={{
-          animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both`,
-          opacity: 0,
-        }}
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-          <div className="mb-3 sm:mb-0 flex items-center">
-            <div className="mr-3 flex-shrink-0">
-              <ProfileImage userId={appointment.patientId} size="md" fallback={patientInitial} role="patient" />
-            </div>
-            <div>
-              <div className="flex items-center">
-                <h3 className="font-medium text-graphite">{appointment.patientName}</h3>
-                {getStatusBadge(appointment.status)}
-              </div>
-              <p className="text-sm text-drift-gray">{appointment.type}</p>
-              {appointment.notes && <p className="text-sm text-drift-gray">Notes: {appointment.notes}</p>}
-              {appointment.note && appointment.status === "approved" && (
-                <p className="mt-1 text-sm font-medium text-graphite">
-                  Your note: <span className="font-normal text-drift-gray">{appointment.note}</span>
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center rounded-md bg-pale-stone px-3 py-1">
-              <Calendar
-                className={`mr-2 h-4 w-4 ${isCompleted || isCancelled ? "text-drift-gray" : "text-amber-500"}`}
-              />
-              <span className="text-sm text-graphite">{new Date(appointment.date).toLocaleDateString()}</span>
-            </div>
-            <div className="flex items-center rounded-md bg-pale-stone px-3 py-1">
-              <Clock className={`mr-2 h-4 w-4 ${isCompleted || isCancelled ? "text-drift-gray" : "text-amber-500"}`} />
-              <span className="text-sm text-graphite">{appointment.time}</span>
-            </div>
-            {isCancelled && (
-              <div className="flex items-center rounded-md bg-pale-stone px-3 py-1">
-                <X className="mr-2 h-4 w-4 text-red-500" />
-                <span className="text-sm text-red-500">Cancelled</span>
-              </div>
-            )}
-          </div>
-        </div>
-        {appointment.note && appointment.status === "cancelled" && (
-          <div className="mt-3 rounded-md bg-red-50 p-2">
-            <p className="text-sm text-red-700">
-              <span className="font-medium">Reason:</span> {appointment.note}
-            </p>
-          </div>
-        )}
-        <div className="mt-4 flex justify-end space-x-2">
-          {appointment.status === "completed" ? (
-            <>
-              <button
-                onClick={() => handleAddSummary(appointment)}
-                className="rounded-md bg-green-100 px-3 py-1 text-sm font-medium text-green-600 transition-colors hover:bg-green-200"
-              >
-                Add Summary
-              </button>
-              <button
-                onClick={() => handleViewSummary(appointment)}
-                className="rounded-md border border-earth-beige bg-white px-3 py-1 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
-                disabled={!hasSummary(appointment)}
-                title={!hasSummary(appointment) ? "No summary available" : ""}
-              >
-                View Summary
-              </button>
-            </>
-          ) : appointment.status === "cancelled" ? (
-            <button
-              onClick={() => handleReschedule(appointment)}
-              className="rounded-md bg-amber-500 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-amber-600"
-            >
-              Reschedule
-            </button>
-          ) : appointment.status === "pending" ? (
-            <>
-              <button
-                onClick={() => handleViewDetails(appointment)}
-                className="rounded-md border border-earth-beige bg-white px-3 py-1 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
-              >
-                Details
-              </button>
-              <button
-                onClick={() => handleCancelAppointment(appointment)}
-                className="rounded-md bg-red-100 px-3 py-1 text-sm font-medium text-red-600 transition-colors hover:bg-red-200"
-              >
-                Decline
-              </button>
-              <button
-                onClick={() => handleApproveAppointment(appointment)}
-                className="rounded-md bg-green-100 px-3 py-1 text-sm font-medium text-green-600 transition-colors hover:bg-green-200"
-              >
-                Approve
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => handleViewDetails(appointment)}
-                className="rounded-md border border-earth-beige bg-white px-3 py-1 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
-              >
-                Details
-              </button>
-              <button
-                onClick={() => handleCancelAppointment(appointment)}
-                className="rounded-md bg-red-100 px-3 py-1 text-sm font-medium text-red-600 transition-colors hover:bg-red-200"
-              >
-                Cancel
-              </button>
-              {/* Add video call button for eligible appointments */}
-              {canJoinCall && (
-                <Link
-                  href={`/doctor/calls/video/${appointment.id}`}
-                  className="rounded-md bg-green-100 px-3 py-1 text-sm font-medium text-green-600 transition-colors hover:bg-green-200 inline-flex items-center"
-                >
-                  <Video className="mr-1 h-4 w-4" />
-                  Join Call
-                </Link>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Update the renderGridAppointment function to include the Join Call button only for eligible appointments
-  const renderGridAppointment = (appointment, index) => {
-    const isCompleted = appointment.status === "completed"
-    const isCancelled = appointment.status === "cancelled"
+    const isCancelled = appointment.status === "cancelled" || appointment.status === "declined"
     const isPending = appointment.status === "pending"
     const isApproved = appointment.status === "approved"
 
-    // Check if appointment is eligible for video call
-    const canJoinCall = isEligibleForVideoCall(appointment, "doctor")
+    // Check if there's an active room for this appointment where patient is invited
+    const roomId = appointmentRoomIds[appointment.id]
+    const hasActiveRoom = !!roomId
+    const canShowJoin = Boolean(
+      roomId && appointment.status === "approved" && (appointment.mode === "online") && isToday(appointment.date)
+    )
 
     // Get first letter of patient name for fallback
     const patientInitial = appointment.patientName ? appointment.patientName.charAt(0).toUpperCase() : "P"
 
-    let statusColor = "bg-gray-100"
-    let statusIcon = null
-
-    if (isPending) {
-      statusColor = "bg-amber-100"
-      statusIcon = <Clock className="h-4 w-4 text-amber-600" />
-    } else if (isApproved) {
-      statusColor = "bg-green-100"
-      statusIcon = <CheckCircle2 className="h-4 w-4 text-green-600" />
-    } else if (isCompleted) {
-      statusColor = "bg-blue-100"
-      statusIcon = <FileText className="h-4 w-4 text-blue-600" />
-    } else if (isCancelled) {
-      statusColor = "bg-red-100"
-      statusIcon = <X className="h-4 w-4 text-red-600" />
-    }
+    const listContainerClasses = `group relative overflow-hidden rounded-md border border-earth-beige bg-white px-3 sm:px-4 py-3 shadow-sm transition-colors hover:bg-pale-stone`
 
     return (
       <div
         key={appointment.id}
-        className={`group overflow-hidden rounded-lg border border-pale-stone bg-white shadow-sm transition-all hover:shadow-md hover:border-amber-500/30 ${
-          isCompleted ? "opacity-80 hover:opacity-100" : ""
-        } ${isCancelled ? "opacity-70 hover:opacity-90" : ""}`}
+        className={listContainerClasses}
         style={{
-          animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both`,
+          animation: `fadeInUp 0.6s ease-out ${index * 0.05}s both`,
           opacity: 0,
         }}
       >
-        <div className={`h-2 w-full ${statusColor}`}></div>
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center">
-              <div className="mr-3 flex-shrink-0">
-                <ProfileImage userId={appointment.patientId} size="md" fallback={patientInitial} role="patient" />
-              </div>
-              <div>
-                <h3 className="font-medium text-graphite">{appointment.patientName}</h3>
-                <p className="text-xs text-drift-gray">{appointment.type}</p>
-              </div>
-            </div>
-            {getStatusBadge(appointment.status)}
-          </div>
-
-          <div className="space-y-2 mb-4">
-            <div className="flex items-center text-sm">
-              <Calendar className="mr-2 h-4 w-4 text-drift-gray" />
-              <span>{new Date(appointment.date).toLocaleDateString()}</span>
-            </div>
-            <div className="flex items-center text-sm">
-              <Clock className="mr-2 h-4 w-4 text-drift-gray" />
-              <span>{appointment.time}</span>
-            </div>
-          </div>
-
-          {appointment.notes && (
-            <div className="mb-4 text-sm">
-              <p className="font-medium text-graphite mb-1">Notes:</p>
-              <p className="text-drift-gray">{appointment.notes}</p>
-            </div>
-          )}
-
-          {appointment.note && appointment.status === "approved" && (
-            <div className="mb-4 text-sm">
-              <p className="font-medium text-graphite mb-1">Your note:</p>
-              <p className="text-drift-gray">{appointment.note}</p>
-            </div>
-          )}
-
-          {appointment.note && appointment.status === "cancelled" && (
-            <div className="mb-4 text-sm">
-              <p className="font-medium text-red-600 mb-1">Cancellation Reason:</p>
-              <p className="text-red-500">{appointment.note}</p>
-            </div>
-          )}
-
-          <div className="flex justify-end space-x-2 mt-auto">
-            {appointment.status === "completed" ? (
-              <>
-                {hasSummary(appointment) ? (
-                  <button
-                    onClick={() => handleViewSummary(appointment)}
-                    className="rounded-md border border-earth-beige bg-white px-3 py-1 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
-                  >
-                    View Summary
-                  </button>
+        {/* Minimalist list: no decorative backgrounds */}
+        
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+            <div className="relative flex-shrink-0">
+              {!isPWA && (
+                <div className="hidden sm:block absolute -inset-1 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full opacity-20 group-hover:opacity-40 transition-opacity blur-sm"></div>
+              )}
+              <div className="relative">
+                {isPWA ? (
+                  <ProfileImage userId={appointment.patientId} size="sm" fallback={patientInitial} role="patient" />
                 ) : (
                   <>
-                    <button
-                      onClick={() => handleAddSummary(appointment)}
-                      className="rounded-md bg-green-100 px-3 py-1 text-sm font-medium text-green-600 transition-colors hover:bg-green-200"
-                    >
-                      Add Summary
-                    </button>
-                    <button
-                      disabled
-                      className="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium text-gray-400 cursor-not-allowed"
-                      title="No summary available"
-                    >
-                      View Summary
-                    </button>
+                    <ProfileImage userId={appointment.patientId} size="sm" className="sm:hidden" fallback={patientInitial} role="patient" />
+                    <ProfileImage userId={appointment.patientId} size="md" className="hidden sm:block" fallback={patientInitial} role="patient" />
                   </>
                 )}
+              </div>
+              {isApproved && (
+                <div className={`absolute ${isPWA ? "-bottom-0.5 -right-0.5 h-4 w-4" : "-bottom-0.5 -right-0.5 sm:-bottom-1 sm:-right-1 h-4 w-4 sm:h-5 sm:w-5"} flex items-center justify-center rounded-full bg-green-500 border-2 border-white`}>
+                  <CheckCircle2 className={`${isPWA ? "h-2.5 w-2.5" : "h-2.5 w-2.5 sm:h-3 sm:w-3"} text-white`} />
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                <h3 className={`font-semibold text-graphite group-hover:text-amber-600 transition-colors truncate ${isPWA ? "text-[13px]" : "text-sm sm:text-lg"}`}>
+                  {appointment.patientName || "Loading..."}
+                </h3>
+                {getStatusBadge(appointment.status)}
+                {appointment.mode && (
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    appointment.mode === "online" 
+                      ? "bg-blue-100 text-blue-700 border border-blue-200" 
+                      : "bg-purple-100 text-purple-700 border border-purple-200"
+                  }`}>
+                    <span className="flex items-center gap-1">
+                      {appointment.mode === "online" ? (
+                        <>
+                          <Globe className="h-3 w-3" />
+                          <span>Online</span>
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="h-3 w-3" />
+                          <span>In-Person</span>
+                        </>
+                      )}
+                    </span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm font-medium text-drift-gray mb-1 sm:mb-3 hidden sm:block">
+                {appointment.type || "Consultation"}
+              </p>
+              
+              {/* Date and Time - Minimalist on mobile */}
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 mb-2 sm:mb-3">
+                <div className="flex items-center gap-1 sm:gap-2 rounded-md sm:rounded-lg bg-amber-50/50 sm:bg-white/90 backdrop-blur-sm px-2 py-1 sm:px-3 sm:py-2 border border-amber-200/50 sm:border-amber-200 shadow-sm sm:shadow-md hover:shadow-md sm:hover:shadow-lg transition-all">
+                  <Calendar
+                    className={`h-3 w-3 sm:h-4 sm:w-4 ${
+                      isCompleted || isCancelled ? "text-drift-gray" : "text-soft-amber"
+                    }`}
+                  />
+                  <span className="text-xs sm:text-sm font-semibold text-graphite whitespace-nowrap">
+                    <span className="sm:hidden">{new Date(appointment.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                    <span className="hidden sm:inline">{new Date(appointment.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</span>
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-2 rounded-md sm:rounded-lg bg-amber-50/50 sm:bg-white/90 backdrop-blur-sm px-2 py-1 sm:px-3 sm:py-2 border border-amber-200/50 sm:border-amber-200 shadow-sm sm:shadow-md hover:shadow-md sm:hover:shadow-lg transition-all">
+                  <Clock className={`h-3 w-3 sm:h-4 sm:w-4 ${
+                    isCompleted || isCancelled ? "text-drift-gray" : "text-soft-amber"
+                  }`} />
+                  <span className="text-xs sm:text-sm font-semibold text-graphite">{appointment.time}</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* Action Buttons (right side) */}
+          <div className={`flex flex-row sm:flex-col gap-2 lg:flex-col xl:flex-row flex-wrap ml-auto items-start ${isPWA ? "mt-1" : ""}`}>
+            {/* Join via notification only; no Join button in list */}
+            {appointment.status === "completed" ? (
+              <>
+                <button
+                  onClick={() => handleAddSummary(appointment)}
+                  disabled={hasSummary(appointment)}
+                  className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all transform ${
+                    hasSummary(appointment)
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:scale-100"
+                      : "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg hover:from-green-600 hover:to-emerald-700 hover:scale-105"
+                  }`}
+                  title={hasSummary(appointment) ? "Summary already added" : ""}
+                >
+                  <FileText className="h-4 w-4" />
+                  Add Summary
+                </button>
+                <button
+                  onClick={() => handleViewSummary(appointment)}
+                  className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all transform hover:scale-105 ${
+                    hasSummary(appointment)
+                      ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:shadow-lg hover:from-blue-600 hover:to-blue-700"
+                      : "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                  }`}
+                  disabled={!hasSummary(appointment)}
+                  title={!hasSummary(appointment) ? "Summary not available yet" : ""}
+                >
+                  <FileText className="h-4 w-4" />
+                  View Summary
+                </button>
               </>
-            ) : appointment.status === "cancelled" ? (
-              <button
-                onClick={() => handleReschedule(appointment)}
-                className="rounded-md bg-amber-500 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-amber-600"
-              >
-                Reschedule
-              </button>
             ) : appointment.status === "pending" ? (
               <>
                 <button
                   onClick={() => handleViewDetails(appointment)}
-                  className="rounded-md border border-earth-beige bg-white px-3 py-1 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite hover:bg-pale-stone transition-colors shadow-sm"
                 >
+                  <FileText className="h-4 w-4" />
                   Details
                 </button>
                 <button
                   onClick={() => handleCancelAppointment(appointment)}
-                  className="rounded-md bg-red-100 px-3 py-1 text-sm font-medium text-red-600 transition-colors hover:bg-red-200"
+                  className="inline-flex items-center justify-center gap-2 rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors shadow-sm"
                 >
+                  <X className="h-4 w-4" />
                   Decline
                 </button>
                 <button
                   onClick={() => handleApproveAppointment(appointment)}
-                  className="rounded-md bg-green-100 px-3 py-1 text-sm font-medium text-green-600 transition-colors hover:bg-green-200"
+                  className="inline-flex items-center justify-center gap-2 rounded-md bg-gradient-to-r from-soft-amber to-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:shadow-lg hover:from-amber-600 hover:to-amber-700 transition-all"
                 >
+                  <CheckCircle2 className="h-4 w-4" />
                   Approve
                 </button>
               </>
+            ) : appointment.status === "cancelled" || appointment.status === "declined" ? (
+              <button
+                onClick={() => handleViewDetails(appointment)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border-2 border-amber-200 bg-white px-4 py-2.5 text-sm font-semibold text-graphite hover:bg-amber-50 hover:border-soft-amber/50 transition-all transform hover:scale-105 shadow-sm hover:shadow-md"
+              >
+                <FileText className="h-4 w-4" />
+                Details
+              </button>
             ) : (
               <>
                 <button
                   onClick={() => handleViewDetails(appointment)}
-                  className="rounded-md border border-earth-beige bg-white px-3 py-1 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border-2 border-amber-200 bg-white px-4 py-2.5 text-sm font-semibold text-graphite hover:bg-amber-50 hover:border-soft-amber/50 transition-all transform hover:scale-105 shadow-sm hover:shadow-md"
                 >
+                  <FileText className="h-4 w-4" />
                   Details
                 </button>
                 <button
                   onClick={() => handleCancelAppointment(appointment)}
-                  className="rounded-md bg-red-100 px-3 py-1 text-sm font-medium text-red-600 transition-colors hover:bg-red-200"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border-2 border-red-500 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 >
+                  <X className="h-4 w-4" />
                   Cancel
                 </button>
-                {/* Add video call button for eligible appointments */}
-                {canJoinCall && (
-                  <Link
-                    href={`/doctor/calls/video/${appointment.id}`}
-                    className="rounded-md bg-green-100 px-3 py-1 text-sm font-medium text-green-600 transition-colors hover:bg-green-200 inline-flex items-center"
-                  >
-                    <Video className="mr-1 h-4 w-4" />
-                    Join Call
-                  </Link>
-                )}
               </>
             )}
           </div>
         </div>
+
+        {/* Notes Section - hidden on mobile for minimalist view */}
+        {appointment.notes && (
+          <div className="hidden sm:block mt-4 rounded-lg bg-white/80 backdrop-blur-sm border border-amber-200/50 p-4 shadow-md">
+            <div className="flex items-center gap-1.5 text-sm text-drift-gray">
+              <FileText className="h-3.5 w-3.5 text-graphite flex-shrink-0" />
+              <span className="font-semibold text-graphite">Notes:</span>
+              <span>{appointment.notes}</span>
+            </div>
+          </div>
+        )}
+        {appointment.note && appointment.status === "approved" && (
+          <div className="hidden sm:block mt-4 rounded-lg bg-green-50/80 backdrop-blur-sm border border-green-200 p-4 shadow-md">
+            <div className="flex items-center gap-1.5 text-sm text-green-700">
+              <FileText className="h-3.5 w-3.5 text-green-700 flex-shrink-0" />
+              <span className="font-semibold">Doctor's Note:</span>
+              <span>{appointment.note}</span>
+            </div>
+          </div>
+        )}
+        {appointment.note && (appointment.status === "cancelled" || appointment.status === "declined") && (
+          <div className="hidden sm:block mt-4 rounded-lg bg-red-50/80 backdrop-blur-sm border border-red-200 p-4 shadow-md">
+            <div className="flex items-center gap-1.5 text-sm text-red-700">
+              <Ban className="h-3.5 w-3.5 text-red-700 flex-shrink-0" />
+              <span className="font-semibold">{appointment.status === "declined" ? "Decline" : "Cancellation"} Reason:</span>
+              <span>{appointment.note}</span>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
-  return (
-    <div className="space-y-6 animate-fadeIn">
-      {/* Header with gradient background */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 p-6 shadow-md">
-        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10"></div>
-        <div className="absolute -bottom-8 -left-8 h-24 w-24 rounded-full bg-white/10"></div>
+  // Render appointment in grid view - matching patient side style
+  const renderGridAppointment = (appointment, index) => {
+    const isCompleted = appointment.status === "completed"
+    const isCancelled = appointment.status === "cancelled" || appointment.status === "declined"
+    const isPending = appointment.status === "pending"
+    const isApproved = appointment.status === "approved"
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white md:text-3xl">Appointments</h1>
-            <p className="mt-1 text-amber-50">Manage your patient appointments</p>
+    // Check if there's an active room for this appointment where patient is invited
+    const roomId = appointmentRoomIds[appointment.id]
+    const hasActiveRoom = !!roomId
+    const canShowJoin = Boolean(
+      roomId && appointment.status === "approved" && (appointment.mode === "online") && isToday(appointment.date)
+    )
+
+    // Get first letter of patient name for fallback
+    const patientInitial = appointment.patientName ? appointment.patientName.charAt(0).toUpperCase() : "P"
+
+    // Get gradient and status styling
+    const getStatusStyles = () => {
+      if (isPending) {
+        return {
+          topBar: "bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600",
+          glow: "shadow-amber-500/20",
+          badgeBg: "bg-amber-50 border-amber-200",
+          badgeText: "text-amber-700",
+        }
+      } else if (isApproved) {
+        return {
+          topBar: "bg-gradient-to-r from-green-400 via-emerald-500 to-green-600",
+          glow: "shadow-green-500/20",
+          badgeBg: "bg-green-50 border-green-200",
+          badgeText: "text-green-700",
+        }
+      } else if (isCompleted) {
+        return {
+          topBar: "bg-gradient-to-r from-blue-400 via-sky-500 to-blue-600",
+          glow: "shadow-blue-500/20",
+          badgeBg: "bg-blue-50 border-blue-200",
+          badgeText: "text-blue-700",
+        }
+      } else if (isCancelled) {
+        return {
+          topBar: "bg-gradient-to-r from-red-400 via-rose-500 to-red-600",
+          glow: "shadow-red-500/20",
+          badgeBg: "bg-red-50 border-red-200",
+          badgeText: "text-red-700",
+        }
+      }
+      return {
+        topBar: "bg-gradient-to-r from-gray-400 to-gray-600",
+        glow: "shadow-gray-500/20",
+        badgeBg: "bg-gray-50 border-gray-200",
+        badgeText: "text-gray-700",
+      }
+    }
+
+    const statusStyles = getStatusStyles()
+
+    return (
+      <div
+        key={appointment.id}
+        className={`relative overflow-hidden rounded-xl border-2 border-amber-200/50 bg-gradient-to-br from-white via-amber-50/20 to-yellow-50/30 shadow-lg transition-all hover:shadow-xl hover:scale-[1.02] flex flex-col ${
+          isCompleted ? "opacity-90 hover:opacity-100" : ""
+        } ${isCancelled ? "opacity-85 hover:opacity-100" : ""}`}
+        style={{
+          animation: `fadeInUp 0.6s ease-out ${index * 0.05}s both`,
+          opacity: 0,
+        }}
+      >
+
+        {/* Content */}
+        <div className="p-5 flex flex-col h-full">
+          {/* Header with profile and name */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="relative flex-shrink-0">
+                <div className={`absolute -inset-1 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full opacity-0 group-hover:opacity-30 transition-opacity duration-300 blur-md`}></div>
+                <div className="relative">
+                  <ProfileImage userId={appointment.patientId} size="md" fallback={patientInitial} role="patient" />
+                </div>
+                {isApproved && (
+                  <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 border-2 border-white shadow-sm">
+                    <CheckCircle2 className="h-3 w-3 text-white" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-graphite text-base group-hover:text-amber-600 transition-colors">
+                    {appointment.patientName || "Loading..."}
+                  </h3>
+                </div>
+                <p className="text-xs font-medium text-drift-gray mt-0.5">
+                  {appointment.type || "Consultation"}
+                </p>
+              </div>
+            </div>
+            {/* Join via notification only; no Join button in grid header */}
           </div>
 
-          <button
-            onClick={() => setIsAppointmentModalOpen(true)}
-            className="mt-4 inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-medium text-amber-500 shadow-sm transition-all hover:bg-amber-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 md:mt-0 animate-fadeIn"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Schedule Appointment
-          </button>
-        </div>
-      </div>
+          {/* Status badge and mode */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            {getStatusBadge(appointment.status)}
+            {appointment.mode && (
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${
+                appointment.mode === "online" 
+                  ? "bg-blue-100 text-blue-700 border border-blue-200" 
+                  : "bg-purple-100 text-purple-700 border border-purple-200"
+              }`}>
+                {appointment.mode === "online" ? (
+                  <>
+                    <Globe className="h-3 w-3" />
+                    <span>Video</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="h-3 w-3" />
+                    <span>Person</span>
+                  </>
+                )}
+              </span>
+            )}
+          </div>
 
-      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+          {/* Date and Time Cards - matching modal style */}
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center gap-2 rounded-lg bg-white/90 backdrop-blur-sm border border-amber-200 p-2.5 shadow-md hover:shadow-lg transition-all">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-soft-amber/20">
+                <Calendar className="h-4 w-4 text-soft-amber" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-drift-gray font-medium">Date</p>
+                <p className="text-sm font-semibold text-graphite truncate">
+                  {new Date(appointment.date).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg bg-white/90 backdrop-blur-sm border border-amber-200 p-2.5 shadow-md hover:shadow-lg transition-all">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-soft-amber/20">
+                <Clock className="h-4 w-4 text-soft-amber" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-drift-gray font-medium">Time</p>
+                <p className="text-sm font-semibold text-graphite">{appointment.time}</p>
+              </div>
+            </div>
+          </div>
+
+
+          {/* Notes */}
+          {appointment.notes && (
+            <div className="mb-4 rounded-lg bg-gradient-to-br from-pale-stone/60 to-pale-stone/40 border border-amber-100 p-2.5">
+              <div className="flex items-center gap-1.5 mb-1">
+                <FileText className="h-3 w-3 text-graphite" />
+                <p className="text-xs font-semibold text-graphite">Notes</p>
+              </div>
+              <p className="text-xs text-drift-gray line-clamp-2">{appointment.notes}</p>
+            </div>
+          )}
+
+          {appointment.note && appointment.status === "approved" && (
+            <div className="mb-4 rounded-lg bg-green-50/80 border border-green-200 p-2.5">
+              <div className="flex items-center gap-1.5 mb-1">
+                <FileText className="h-3 w-3 text-green-700" />
+                <p className="text-xs font-semibold text-green-700">Doctor's Note</p>
+              </div>
+              <p className="text-xs text-green-600 line-clamp-2">{appointment.note}</p>
+            </div>
+          )}
+
+          {(appointment.note && (appointment.status === "cancelled" || appointment.status === "declined")) && (
+            <div className="mb-4 rounded-lg bg-red-50/80 border border-red-200 p-2.5">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Ban className="h-3 w-3 text-red-700" />
+                <p className="text-xs font-semibold text-red-700">{appointment.status === "declined" ? "Declined" : "Cancelled"}</p>
+              </div>
+              <p className="text-xs text-red-600 line-clamp-2">{appointment.note}</p>
+            </div>
+          )}
+
+          {/* Action Buttons - footer section with consistent alignment (right side on cards) */}
+          <div className="flex flex-col gap-2 mt-auto pt-4 border-t border-pale-stone">
+            {appointment.status === "completed" ? (
+              <>
+                <button
+                  onClick={() => handleAddSummary(appointment)}
+                  disabled={hasSummary(appointment)}
+                  className={`w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all transform ${
+                    hasSummary(appointment)
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200 hover:scale-100"
+                      : "bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-md hover:shadow-lg hover:from-green-600 hover:to-emerald-700 hover:scale-105"
+                  }`}
+                  title={hasSummary(appointment) ? "Summary already added" : ""}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Add Summary
+                </button>
+                <button
+                  onClick={() => handleViewSummary(appointment)}
+                  className={`w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all transform hover:scale-105 ${
+                    hasSummary(appointment)
+                      ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md hover:shadow-lg hover:from-blue-600 hover:to-blue-700"
+                      : "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                  }`}
+                  disabled={!hasSummary(appointment)}
+                  title={!hasSummary(appointment) ? "Summary not available yet" : ""}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  View Summary
+                </button>
+              </>
+            ) : appointment.status === "pending" ? (
+              <>
+                <button
+                  onClick={() => handleViewDetails(appointment)}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-earth-beige bg-white px-4 py-2 text-xs font-medium text-graphite hover:bg-pale-stone transition-colors shadow-sm"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Details
+                </button>
+                <button
+                  onClick={() => handleCancelAppointment(appointment)}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-red-300 bg-white px-4 py-2 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors shadow-sm"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Decline
+                </button>
+                <button
+                  onClick={() => handleApproveAppointment(appointment)}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-gradient-to-r from-soft-amber to-amber-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:shadow-lg hover:from-amber-600 hover:to-amber-700 transition-all"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Approve
+                </button>
+              </>
+            ) : appointment.status === "cancelled" || appointment.status === "declined" ? (
+              <button
+                onClick={() => handleViewDetails(appointment)}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-lg border-2 border-amber-300 bg-white px-4 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 hover:border-amber-400 transition-all transform hover:scale-105 shadow-sm hover:shadow-md"
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Details
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleViewDetails(appointment)}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border-2 border-amber-300 bg-white px-4 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 hover:border-amber-400 transition-all transform hover:scale-105 shadow-sm hover:shadow-md"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Details
+                </button>
+                <button
+                  onClick={() => handleCancelAppointment(appointment)}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border-2 border-red-500 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-4 py-2.5 text-xs font-bold text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Decorative corner accent */}
+        <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/5 to-transparent rounded-bl-full pointer-events-none"></div>
+      </div>
+    )
+  }
+
+  // Create action buttons for header
+  const headerActionButtons = (
+    <div className="flex flex-col sm:flex-row gap-2">
+      <button
+        onClick={() => setIsAppointmentModalOpen(true)}
+        className="inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-medium text-soft-amber shadow-sm transition-all hover:bg-amber-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 animate-fadeIn"
+      >
+        <Plus className="mr-2 h-4 w-4" />
+        Schedule Appointment
+      </button>
+      <button
+        onClick={() => setIsCreateRoomOpen(true)}
+        className="inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-medium text-soft-amber shadow-sm transition-all hover:bg-amber-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 animate-fadeIn"
+      >
+        <Video className="mr-2 h-4 w-4" />
+        Create Room
+      </button>
+    </div>
+  )
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Dashboard Header Banner with page-specific content */}
+      <DashboardHeaderBanner
+        userRole="doctor"
+        title="Appointments"
+        subtitle="Manage your patient appointments"
+        actionButton={headerActionButtons}
+        showMetrics={false}
+      />
+
+      {/* Search and controls - matching modal style */}
+      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 gap-4">
         <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-drift-gray" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-drift-gray pointer-events-none" />
           <input
             type="text"
             placeholder="Search by patient, type, or notes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-md border border-earth-beige bg-white py-2 pl-10 pr-3 text-graphite placeholder:text-drift-gray/60 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+            className="w-full rounded-lg border border-amber-200 bg-white py-2.5 pl-10 pr-3 text-graphite placeholder:text-drift-gray/60 focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber transition-all shadow-sm hover:shadow-md"
           />
         </div>
         <div className="flex space-x-2">
           <button
             onClick={toggleViewMode}
-            className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite shadow-sm transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-graphite shadow-sm transition-all hover:bg-amber-50 hover:border-amber-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
           >
             {viewMode === "list" ? (
               <>
-                <LayoutGrid className="mr-2 h-4 w-4" />
+                <LayoutGrid className="h-4 w-4" />
                 Grid View
               </>
             ) : (
               <>
-                <LayoutList className="mr-2 h-4 w-4" />
+                <LayoutList className="h-4 w-4" />
                 List View
               </>
             )}
           </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite shadow-sm transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-graphite shadow-sm transition-all hover:bg-amber-50 hover:border-amber-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2 relative"
           >
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
+            <SlidersHorizontal className="h-4 w-4" />
             Filters
-            {(filterStatus !== "all" || filterPatient !== "all") && (
-              <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-xs text-white">
-                {(filterStatus !== "all" ? 1 : 0) + (filterPatient !== "all" ? 1 : 0)}
+            {(filterStatus !== "all" || filterPatient !== "all" || filterType !== "all") && (
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-soft-amber to-amber-500 text-xs font-bold text-white shadow-md">
+                {(filterStatus !== "all" ? 1 : 0) + (filterPatient !== "all" ? 1 : 0) + (filterType !== "all" ? 1 : 0)}
               </span>
             )}
           </button>
         </div>
       </div>
 
-      {showFilters && (
-        <div className="rounded-lg border border-earth-beige bg-white p-4 shadow-sm animate-slideDown">
+      {/* Filters with smooth animation - matching modal style */}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          showFilters
+            ? "max-h-96 opacity-100 mb-4"
+            : "max-h-0 opacity-0 mb-0"
+        }`}
+      >
+        <div className="rounded-2xl border border-amber-200/50 bg-gradient-to-br from-white to-amber-50/30 p-4 shadow-lg backdrop-blur-sm">
           <div className="flex flex-col space-y-4 sm:flex-row sm:items-end sm:space-x-4 sm:space-y-0">
             <div className="flex-1 space-y-2">
-              <label htmlFor="filterStatus" className="text-sm font-medium text-graphite">
+              <label htmlFor="filterStatus" className="text-sm font-semibold text-graphite">
                 Status
               </label>
-              <select
-                id="filterStatus"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-              >
-                <option value="all">All</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+              <div className="relative">
+                <select
+                  id="filterStatus"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full rounded-lg border border-amber-200 bg-white py-2.5 pl-3 pr-8 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber transition-all shadow-sm hover:shadow-md appearance-none cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>')}")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 8px center',
+                    backgroundSize: '14px 14px',
+                  }}
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                  <option value="declined">Declined</option>
+                </select>
+              </div>
             </div>
             <div className="flex-1 space-y-2">
-              <label htmlFor="filterPatient" className="text-sm font-medium text-graphite">
+              <label htmlFor="filterPatient" className="text-sm font-semibold text-graphite">
                 Patient
               </label>
-              <select
-                id="filterPatient"
-                value={filterPatient}
-                onChange={(e) => setFilterPatient(e.target.value)}
-                className="w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
-              >
-                <option value="all">All Patients</option>
-                {patients.map((patient) => (
-                  <option key={patient.id} value={patient.id}>
-                    {patient.displayName || patient.name || "Unknown Patient"}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="filterPatient"
+                  value={filterPatient}
+                  onChange={(e) => setFilterPatient(e.target.value)}
+                  className="w-full rounded-lg border border-amber-200 bg-white py-2.5 pl-3 pr-8 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber transition-all shadow-sm hover:shadow-md appearance-none cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>')}")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 8px center',
+                    backgroundSize: '14px 14px',
+                  }}
+                >
+                  <option value="all">All Patients</option>
+                  {patients.map((patient) => (
+                    <option key={patient.id} value={patient.id}>
+                      {patient.displayName || patient.name || "Unknown Patient"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex-1 space-y-2">
+              <label htmlFor="filterType" className="text-sm font-semibold text-graphite">
+                Type
+              </label>
+              <div className="relative">
+                <select
+                  id="filterType"
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="w-full rounded-lg border border-amber-200 bg-white py-2.5 pl-3 pr-8 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber transition-all shadow-sm hover:shadow-md appearance-none cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml;charset=UTF-8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>')}")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 8px center',
+                    backgroundSize: '14px 14px',
+                  }}
+                >
+                  <option value="all">All Types</option>
+                  {appointmentTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <button
               onClick={clearFilters}
-              className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
+              className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-graphite transition-all hover:bg-amber-50 hover:border-amber-300 hover:shadow-md shadow-sm"
             >
-              Clear Filters
+              <X className="h-4 w-4" />
+              Clear
             </button>
           </div>
         </div>
-      )}
+      </div>
 
       <div className="space-y-4" id="appointments-section">
         {loading ? (
@@ -818,108 +1188,42 @@ export default function DoctorAppointmentsPage() {
           </div>
         ) : displayedAppointments.length > 0 ? (
           <>
-            {/* Pending Appointments */}
-            {displayedAppointments.some((a) => a.status === "pending") && (
-              <div className="space-y-4 animate-fadeIn">
-                <h2 className="text-lg font-semibold text-graphite">Pending Appointments</h2>
-                {viewMode === "list" ? (
-                  <div className="space-y-4">
-                    {displayedAppointments
-                      .filter((a) => a.status === "pending")
-                      .map((appointment, index) => renderListAppointment(appointment, index))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {displayedAppointments
-                      .filter((a) => a.status === "pending")
-                      .map((appointment, index) => renderGridAppointment(appointment, index))}
-                  </div>
-                )}
+            {/* Display all filtered appointments with pagination (10 per page) */}
+            {viewMode === "list" ? (
+              <div className="space-y-4">
+                {displayedAppointments.map((appointment, index) => renderListAppointment(appointment, index))}
               </div>
-            )}
-
-            {/* Approved Appointments */}
-            {displayedAppointments.some((a) => a.status === "approved") && (
-              <div className="space-y-4 animate-fadeIn">
-                <h2 className="text-lg font-semibold text-graphite">Approved Appointments</h2>
-                {viewMode === "list" ? (
-                  <div className="space-y-4">
-                    {displayedAppointments
-                      .filter((a) => a.status === "approved")
-                      .map((appointment, index) => renderListAppointment(appointment, index))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {displayedAppointments
-                      .filter((a) => a.status === "approved")
-                      .map((appointment, index) => renderGridAppointment(appointment, index))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Past Appointments */}
-            {displayedAppointments.some((a) => a.status === "completed") && (
-              <div className="space-y-4 animate-fadeIn">
-                <h2 className="text-lg font-semibold text-graphite">Past Appointments</h2>
-                {viewMode === "list" ? (
-                  <div className="space-y-4">
-                    {displayedAppointments
-                      .filter((a) => a.status === "completed")
-                      .map((appointment, index) => renderListAppointment(appointment, index))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {displayedAppointments
-                      .filter((a) => a.status === "completed")
-                      .map((appointment, index) => renderGridAppointment(appointment, index))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Cancelled Appointments */}
-            {displayedAppointments.some((a) => a.status === "cancelled") && (
-              <div className="space-y-4 animate-fadeIn">
-                <h2 className="text-lg font-semibold text-graphite">Cancelled Appointments</h2>
-                {viewMode === "list" ? (
-                  <div className="space-y-4">
-                    {displayedAppointments
-                      .filter((a) => a.status === "cancelled")
-                      .map((appointment, index) => renderListAppointment(appointment, index))}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {displayedAppointments
-                      .filter((a) => a.status === "cancelled")
-                      .map((appointment, index) => renderGridAppointment(appointment, index))}
-                  </div>
-                )}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {displayedAppointments.map((appointment, index) => renderGridAppointment(appointment, index))}
               </div>
             )}
           </>
         ) : (
-          <div className="rounded-lg border border-pale-stone bg-white p-8 text-center shadow-sm animate-fadeIn">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-pale-stone">
-              <CalendarDays className="h-8 w-8 text-drift-gray" />
+          <div className="rounded-2xl border border-amber-200/50 bg-gradient-to-br from-white to-amber-50/30 p-8 text-center shadow-lg animate-fadeIn backdrop-blur-sm">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-soft-amber/20">
+              <CalendarDays className="h-8 w-8 text-soft-amber" />
             </div>
-            <h3 className="mb-1 text-lg font-medium text-graphite">No Appointments Found</h3>
-            <p className="mb-4 text-drift-gray">
-              {searchTerm || filterStatus !== "all" || filterPatient !== "all"
+            <h3 className="mb-1 text-lg font-semibold text-graphite">No Appointments Found</h3>
+            <p className="mb-4 text-sm text-drift-gray">
+              {searchTerm || filterStatus !== "all" || filterPatient !== "all" || filterType !== "all"
                 ? "No appointments match your search criteria. Try adjusting your filters."
-                : "You don't have any appointments scheduled. Schedule your first appointment now."}
+                : "You don't have any appointments scheduled."}
             </p>
             <button
               onClick={() => setIsAppointmentModalOpen(true)}
-              className="inline-flex items-center rounded-md bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-soft-amber to-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:from-amber-500 hover:to-amber-600 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2 transform hover:scale-105"
             >
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4" />
               Schedule Appointment
             </button>
           </div>
         )}
+        {/* Pagination - always show if there are more than 10 appointments */}
         {filteredAppointments.length > appointmentsPerPage && (
-          <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+          <div className="mt-6">
+            <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+          </div>
         )}
       </div>
 
@@ -929,6 +1233,12 @@ export default function DoctorAppointmentsPage() {
         onClose={() => setIsAppointmentModalOpen(false)}
         userRole="doctor"
         onBook={handleBookAppointment}
+        patients={patients}
+      />
+
+      <CreateRoomModal
+        isOpen={isCreateRoomOpen}
+        onClose={() => setIsCreateRoomOpen(false)}
         patients={patients}
       />
 
@@ -953,12 +1263,6 @@ export default function DoctorAppointmentsPage() {
         appointment={selectedAppointment}
       />
 
-      <RescheduleModal
-        isOpen={isRescheduleModalOpen}
-        onClose={() => setIsRescheduleModalOpen(false)}
-        appointment={selectedAppointment}
-        onReschedule={confirmReschedule}
-      />
 
       <AppointmentApprovalModal
         isOpen={isApprovalModalOpen}
@@ -1017,6 +1321,9 @@ export default function DoctorAppointmentsPage() {
           animation: slideDown 0.3s ease-out;
         }
       `}</style>
+
+      {/* Notification Listener for Push Notifications */}
+      {user && <NotificationListener userId={user.uid} enabled={true} />}
     </div>
   )
 }

@@ -22,6 +22,7 @@ import { NotificationBell } from "./notification-bell"
 import ProfileImage from "./profile-image"
 import { Logo } from "@/components/logo"
 import { DoctorSearch } from "./doctor-search"
+import { AppointmentModal } from "@/components/appointment-modal"
 
 export function DashboardNav() {
   const pathname = usePathname()
@@ -30,6 +31,8 @@ export function DashboardNav() {
   const [showNotifications, setShowNotifications] = useState(false)
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false)
   const [showMobileSearch, setShowMobileSearch] = useState(false)
+  const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false)
+  const [selectedDoctorForBooking, setSelectedDoctorForBooking] = useState(null)
   const notificationRef = useRef(null)
   const userMenuRef = useRef(null)
   const { user, userProfile, logout } = useAuth()
@@ -75,6 +78,12 @@ export function DashboardNav() {
     setShowMobileSearch(!showMobileSearch)
   }
 
+  const handleRequestBookFromSearch = (doctor) => {
+    // doctor from search has id and displayName
+    setSelectedDoctorForBooking(doctor ? { id: doctor.id, name: doctor.displayName } : null)
+    setIsAppointmentModalOpen(true)
+  }
+
   // Get profile photo URL from userProfile or user
   const profilePhotoURL = userProfile?.photoURL || user?.photoURL || null
 
@@ -112,7 +121,7 @@ export function DashboardNav() {
 
           <div className="flex items-center justify-end space-x-4 md:w-1/4">
             {/* Desktop Search Bar */}
-            {!isMobile && <DoctorSearch />}
+          {!isMobile && <DoctorSearch />}
 
             {/* Mobile Search Icon */}
             {isMobile && (
@@ -178,12 +187,26 @@ export function DashboardNav() {
 
       {/* Mobile Search Overlay */}
       {isMobile && showMobileSearch && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-start justify-center pt-20">
-          <div className="w-full max-w-md mx-4 bg-white rounded-lg shadow-lg overflow-hidden">
-            <DoctorSearch isOverlay={true} onClose={toggleMobileSearch} />
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xl flex items-start justify-center pt-20"
+          onClick={toggleMobileSearch}
+        >
+          <div
+            className="w-full max-w-md mx-4 rounded-2xl shadow-2xl overflow-hidden bg-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DoctorSearch isOverlay={true} onClose={toggleMobileSearch} onRequestBook={handleRequestBookFromSearch} />
           </div>
         </div>
       )}
+
+      {/* Global Appointment Modal for handling bookings from mobile overlay */}
+      <AppointmentModal
+        isOpen={isAppointmentModalOpen}
+        onClose={() => setIsAppointmentModalOpen(false)}
+        userRole="patient"
+        selectedDoctor={selectedDoctorForBooking}
+      />
 
       <LogoutConfirmation
         isOpen={showLogoutConfirmation}
@@ -193,3 +216,5 @@ export function DashboardNav() {
     </>
   )
 }
+
+

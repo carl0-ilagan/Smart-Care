@@ -3,8 +3,10 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { ArrowLeft, CheckCircle2, LogIn, Shield } from "lucide-react"
 import { AdminSigninModal } from "@/components/admin-signin-modal"
 import { WelcomeModal } from "@/components/welcome-modal"
+import { SignupModal } from "@/components/signup-modal"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function LoginPage() {
@@ -16,6 +18,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [showWelcomeModal, setShowWelcomeModal] = useState(false)
+  const [hasLoggedIn, setHasLoggedIn] = useState(false)
+  const [showSignupModal, setShowSignupModal] = useState(false)
   const router = useRouter()
   const { login, signInWithGoogle, userRole, user } = useAuth()
 
@@ -32,9 +36,19 @@ export default function LoginPage() {
     checkAdminSession()
   }, [])
 
-  // Redirect if user is already logged in
+  // Show welcome modal when user logs in
   useEffect(() => {
-    if (user && userRole) {
+    console.log("useEffect check - user:", !!user, "userRole:", userRole, "showWelcomeModal:", showWelcomeModal, "hasLoggedIn:", hasLoggedIn)
+    if (user && userRole && !showWelcomeModal && hasLoggedIn) {
+      console.log("✅ User logged in, showing welcome modal")
+      setShowWelcomeModal(true)
+    }
+  }, [user, userRole, showWelcomeModal, hasLoggedIn])
+
+  // Redirect if user is already logged in (ONLY if not showing welcome modal and not just logged in)
+  useEffect(() => {
+    if (user && userRole && !showWelcomeModal && !hasLoggedIn) {
+      // This handles cases where user is already logged in (page refresh scenario)
       if (userRole === "patient") {
         router.push("/dashboard")
       } else if (userRole === "doctor") {
@@ -43,7 +57,7 @@ export default function LoginPage() {
         router.push("/admin/dashboard")
       }
     }
-  }, [user, userRole, router])
+  }, [user, userRole, router, showWelcomeModal, hasLoggedIn])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -66,6 +80,7 @@ export default function LoginPage() {
 
   const handleWelcomeModalClose = () => {
     setShowWelcomeModal(false)
+    setHasLoggedIn(false) // Reset the flag
     // Redirect to appropriate dashboard
     if (userRole === "patient") {
       router.push("/dashboard")
@@ -79,13 +94,23 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true)
     try {
+      // Set flags FIRST before calling signInWithGoogle
+      console.log("Setting hasLoggedIn to true BEFORE Google login")
+      setHasLoggedIn(true)
+      
       const result = await signInWithGoogle()
+      
+      // Wait a bit for auth state to settle
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      
       // Only show welcome modal if sign-in was successful
       if (result) {
+        console.log("Google login successful, showing welcome modal")
         setShowWelcomeModal(true)
       }
     } catch (error) {
       console.error("Google sign-in error:", error)
+      setHasLoggedIn(false) // Reset on error
       setError("Failed to sign in with Google. Please try again.")
     } finally {
       setIsLoading(false)
@@ -93,18 +118,44 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-pale-stone">
+    <div className="min-h-screen flex flex-col relative overflow-hidden bg-gradient-to-br from-pale-stone via-white to-pale-stone">
+      {/* Animated background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-soft-amber/5 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-10 w-40 h-40 bg-soft-amber/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }}></div>
+        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-soft-amber/3 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 animate-pulse" style={{ animationDelay: "2s" }}></div>
+        <span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-soft-amber/60 animate-orbit"></span>
+        <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-300/70 animate-orbitSlow"></span>
+      </div>
       {/* Admin already signed in modal */}
       <AdminSigninModal isOpen={showAdminModal} onClose={() => setShowAdminModal(false)} />
 
-      {/* Welcome modal */}
+      {/* Welcome modal - Show when user has just logged in */}
       {showWelcomeModal && (
-        <WelcomeModal isOpen={showWelcomeModal} onClose={handleWelcomeModalClose} userType={userRole} />
+        <WelcomeModal 
+          isOpen={showWelcomeModal} 
+          onClose={handleWelcomeModalClose} 
+          userType={userRole} 
+          userName={user?.displayName || ""} 
+        />
       )}
 
-      <div className="flex flex-col md:flex-row flex-1">
+      {/* Signup modal */}
+      <SignupModal isOpen={showSignupModal} onClose={() => setShowSignupModal(false)} onSwitchToSignin={() => setShowSignupModal(false)} />
+
+      <div className="flex flex-col md:flex-row flex-1 relative z-10">
+        {/* Back to welcome */}
+        <div className="absolute left-4 top-4">
+          <button
+            onClick={() => router.push("/")}
+            className="inline-flex items-center justify-center px-4 py-2 rounded-full border-2 border-soft-amber text-soft-amber font-semibold transition-all duration-300 hover:bg-soft-amber hover:text-white"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </button>
+        </div>
         {/* Left side - Login form */}
-        <div className="w-full md:w-1/2 flex items-center justify-center p-8">
+        <div className="w-full md:w-1/2 flex items-center justify-center p-6 sm:p-8">
           <div className="w-full max-w-md">
             <div className="text-center mb-8">
               <Link href="/" className="inline-block">
@@ -116,7 +167,7 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-8">
+            <div className="bg-white rounded-2xl shadow-lg ring-4 ring-soft-amber/10 animate-glow p-6 sm:p-8">
               <h1 className="text-2xl font-bold text-graphite mb-6">Sign In</h1>
 
               {error && <div className="mb-4 p-3 rounded-md bg-red-50 text-red-600 text-sm">{error}</div>}
@@ -151,13 +202,43 @@ export default function LoginPage() {
                 </svg>
                 {isLoading ? "Signing in..." : "Sign in with Google"}
               </button>
+              
+              {/* How to sign in - steps */}
+              <div className="mt-6 rounded-xl border border-earth-beige bg-pale-stone/40 p-4 sm:p-5">
+                <h3 className="mb-3 text-sm font-semibold text-graphite flex items-center gap-2">
+                  <LogIn className="h-4 w-4 text-soft-amber" />
+                  How to sign in
+                </h3>
+                <ol className="space-y-3">
+                  <li className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-soft-amber text-white text-xs">1</span>
+                    <span className="text-sm text-drift-gray">Click the <span className="font-medium text-graphite">“Sign in with Google”</span> button.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-soft-amber text-white text-xs">2</span>
+                    <span className="text-sm text-drift-gray">Choose your Google account and grant access if prompted.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-soft-amber text-white text-xs">3</span>
+                    <span className="text-sm text-drift-gray">We’ll welcome you <span className="font-medium text-graphite">then take you to your dashboard</span>.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-soft-amber text-white text-xs">4</span>
+                    <span className="text-sm text-drift-gray flex items-start gap-2"><Shield className="h-4 w-4 text-soft-amber mt-0.5" />New users may see <span className="font-medium text-graphite">Waiting for Approval</span> first.</span>
+                  </li>
+                </ol>
+                <div className="mt-4 flex items-center gap-2 text-xs text-drift-gray">
+                  <CheckCircle2 className="h-4 w-4 text-soft-amber" />
+                  Secure sign-in powered by Google. We never see your password.
+                </div>
+              </div>
 
               <div className="mt-6 text-center">
                 <p className="text-sm text-drift-gray">
                   Don't have an account?{" "}
-                  <Link href="/signup" className="text-soft-amber hover:underline">
+                  <button type="button" onClick={() => setShowSignupModal(true)} className="text-soft-amber hover:underline">
                     Sign up
-                  </Link>
+                  </button>
                 </p>
               </div>
             </div>
@@ -165,47 +246,63 @@ export default function LoginPage() {
         </div>
 
         {/* Right side - Animation */}
-        <div className="hidden md:block md:w-1/2 bg-soft-amber/10">
+        <div className="hidden md:block md:w-1/2 bg-gradient-to-b from-soft-amber/10 via-transparent to-soft-amber/10">
           <div className="h-full flex items-center justify-center p-8">
-            <div className="max-w-lg w-full flex flex-col items-center justify-center relative">
-              {/* Animated lock and hand */}
-              <div className="relative h-64 w-full flex items-center justify-center mb-8">
-                {/* Floating lock */}
-                <div id="login-lock" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 transition-transform duration-500">
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-yellow-50 shadow-lg">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto">
-                      <rect x="6" y="10" width="12" height="8" rx="2" fill="#FBBF24"/>
-                      <rect x="9" y="6" width="6" height="6" rx="3" fill="#FDE68A"/>
-                    </svg>
-                  </div>
-                </div>
-                {/* Waving hand */}
-                <div id="login-hand" className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 transition-transform duration-500" style={{ transform: 'translate(-50%, -120%)' }}>
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-md">
-                    <span role="img" aria-label="waving hand" className="text-4xl animate-wave">👋</span>
-                  </div>
-                </div>
-                {/* Floating particles */}
-                <div className="absolute -top-4 right-10 animate-float-slow">
-                  <div className="bg-soft-amber/10 rounded-full p-1.5">
-                    <div className="h-3 w-3 rounded-full bg-soft-amber/30"></div>
-                  </div>
-                </div>
-                <div className="absolute bottom-0 left-10 animate-float-slow-delay">
-                  <div className="bg-soft-amber/10 rounded-full p-1.5">
-                    <div className="h-3 w-3 rounded-full bg-soft-amber/30"></div>
-                  </div>
-                </div>
-                <div className="absolute -bottom-8 right-16 animate-float-slow-delay-more">
-                  <div className="bg-soft-amber/10 rounded-full p-1.5">
-                    <div className="h-3 w-3 rounded-full bg-soft-amber/30"></div>
-                  </div>
+            <div className="relative w-full max-w-2xl h-[32rem] lg:h-[36rem]">
+              {/* Large glowing gradient orb */}
+              <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-soft-amber/30 via-white to-orange-200/30 blur-2xl animate-spin-slow"></div>
+              {/* Outer soft ring */}
+              <div className="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-white/30 to-soft-amber/20 blur-xl"></div>
+              {/* Core circle with shimmer ring */}
+              <div className="absolute left-1/2 top-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-xl ring-8 ring-soft-amber/10 overflow-hidden animate-glow">
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-soft-amber/20 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }}></div>
+                <div className="absolute inset-8 rounded-full bg-gradient-to-br from-yellow-50 via-white to-amber-50 flex items-center justify-center">
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-soft-amber">
+                    <rect x="6" y="10" width="12" height="8" rx="2" fill="#FBBF24"/>
+                    <rect x="9" y="6" width="6" height="6" rx="3" fill="#FDE68A"/>
+                  </svg>
                 </div>
               </div>
-              <h2 className="text-3xl font-bold text-graphite mb-4">Welcome Back!</h2>
-              <p className="text-drift-gray mb-8">
-                Sign in to access your Smart Care dashboard and manage your health with ease.
-              </p>
+
+              {/* Orbiting particles */}
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-soft-amber/80 orbit" style={{ height: '10px', width: '10px', ['--r']: '150px', animationDuration: '10s' }}></span>
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-300/80 orbit" style={{ height: '8px', width: '8px', ['--r']: '190px', animationDuration: '14s' }}></span>
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-200/90 orbit reverse" style={{ height: '6px', width: '6px', ['--r']: '120px', animationDuration: '8s' }}></span>
+              {/* Additional accent particles */}
+              <div className="absolute -top-2 right-24 h-3 w-3 rounded-full bg-soft-amber/40 animate-float-soft"></div>
+              <div className="absolute bottom-6 left-20 h-2.5 w-2.5 rounded-full bg-orange-300/40 animate-float-soft-delayed"></div>
+
+              {/* Floating glass cards */}
+              <div className="absolute -left-4 top-8 w-48 rounded-2xl bg-white/60 backdrop-blur-sm border border-soft-amber/20 shadow-md p-4 animate-float-soft rotate-[-2deg]">
+                <div className="h-2 w-24 rounded-full bg-soft-amber/30 mb-3"></div>
+                <div className="space-y-2">
+                  <div className="h-2 rounded-full bg-earth-beige/60"></div>
+                  <div className="h-2 rounded-full bg-earth-beige/40 w-3/4"></div>
+                </div>
+              </div>
+              <div className="absolute right-2 bottom-14 w-52 rounded-2xl bg-white/60 backdrop-blur-sm border border-soft-amber/20 shadow-md p-4 animate-float-soft-delayed rotate-[2deg]">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-7 w-7 rounded-full bg-soft-amber/30"></div>
+                  <div className="h-2 w-20 rounded-full bg-earth-beige/60"></div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-2 rounded-full bg-earth-beige/50"></div>
+                  <div className="h-2 rounded-full bg-earth-beige/30 w-2/3"></div>
+                </div>
+              </div>
+              <div className="absolute left-10 bottom-28 w-40 rounded-2xl bg-white/60 backdrop-blur-sm border border-soft-amber/20 shadow-md p-4 animate-float-soft" style={{ animationDuration: '6s' }}>
+                <div className="h-2 w-16 rounded-full bg-soft-amber/30 mb-3"></div>
+                <div className="space-y-2">
+                  <div className="h-2 rounded-full bg-earth-beige/60"></div>
+                  <div className="h-2 rounded-full bg-earth-beige/40 w-2/3"></div>
+                </div>
+              </div>
+
+              {/* Title and caption */}
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-0 text-center">
+                <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-graphite via-soft-amber to-graphite">Welcome Back!</h2>
+                <p className="text-drift-gray mt-2">Sign in to manage your care with ease.</p>
+              </div>
             </div>
           </div>
           <style jsx global>{`
@@ -235,6 +332,49 @@ export default function LoginPage() {
               100% { transform: rotate(0deg); }
             }
             .animate-wave { animation: wave 2s infinite; display: inline-block; }
+            /* Moved from bottom to avoid nested styled-jsx */
+            @keyframes glowPulse {
+              0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.18); }
+              50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.08); }
+            }
+            .animate-glow { animation: glowPulse 2.4s ease-in-out infinite; }
+            @keyframes orbit {
+              0% { transform: rotate(0deg) translateX(120px) rotate(0deg); }
+              100% { transform: rotate(360deg) translateX(120px) rotate(-360deg); }
+            }
+            .animate-orbit { animation: orbit 9s linear infinite; }
+            .animate-orbitSlow { animation: orbit 12s linear infinite; }
+
+            /* New smooth animations */
+            @keyframes shimmer {
+              0% { background-position: -200% 0; }
+              100% { background-position: 200% 0; }
+            }
+            .animate-shimmer { animation: shimmer 3s linear infinite; }
+            @keyframes spin-slow {
+              0% { transform: rotate(0deg) scale(1); }
+              50% { transform: rotate(180deg) scale(1.02); }
+              100% { transform: rotate(360deg) scale(1); }
+            }
+            .animate-spin-slow { animation: spin-slow 20s linear infinite; }
+            @keyframes float-soft {
+              0%, 100% { transform: translateY(0) }
+              50% { transform: translateY(-6px) }
+            }
+            .animate-float-soft { animation: float-soft 4.5s ease-in-out infinite; }
+            .animate-float-soft-delayed { animation: float-soft 5.2s ease-in-out infinite 0.6s; }
+
+            /* Variable-radius orbits and reverse */
+            .orbit { animation: orbitVar 12s linear infinite; height: 8px; width: 8px; }
+            .orbit.reverse { animation-name: orbitVarRev; }
+            @keyframes orbitVar {
+              0% { transform: rotate(0deg) translateX(var(--r, 140px)) rotate(0deg); }
+              100% { transform: rotate(360deg) translateX(var(--r, 140px)) rotate(-360deg); }
+            }
+            @keyframes orbitVarRev {
+              0% { transform: rotate(360deg) translateX(var(--r, 140px)) rotate(-360deg); }
+              100% { transform: rotate(0deg) translateX(var(--r, 140px)) rotate(0deg); }
+            }
           `}</style>
         </div>
       </div>

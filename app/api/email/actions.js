@@ -43,26 +43,22 @@ export async function sendApprovalEmail(userEmail, userName, userRole) {
       `,
     }
 
-    // Log email details
-    logEmailDetails(emailData)
+    // Try to actually send via SMTP API route
+    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/email/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: emailData.to, subject: emailData.subject, text: emailData.text, html: emailData.html }),
+    })
 
-    // In a real application, you would use an email service like SendGrid here
-    // Example with SendGrid:
-    /*
-    if (process.env.SENDGRID_API_KEY) {
-      const sgMail = require('@sendgrid/mail')
-      sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-      await sgMail.send(emailData)
+    if (!res.ok) {
+      // Fallback: log details if API route is unavailable
+      logEmailDetails(emailData)
+      console.warn("/api/email/send failed, logged instead.")
+      return { success: false, message: "Failed to send via API route; logged instead." }
     }
-    */
 
-    // For now, we'll just log that the email would be sent
-    console.log(`[SERVER ACTION] Email would be sent to ${userEmail} in production`)
-
-    return {
-      success: true,
-      message: `Approval email sent to ${userEmail}`,
-    }
+    const data = await res.json()
+    return { success: true, message: `Approval email sent to ${userEmail}`, id: data?.id || null }
   } catch (error) {
     console.error("Error sending approval email:", error)
     return {
@@ -94,17 +90,21 @@ export async function sendRejectionEmail(userEmail, userName, userRole, reason =
       `,
     }
 
-    // Log email details
-    logEmailDetails(emailData)
+    // Try to actually send via SMTP API route
+    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/email/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: emailData.to, subject: emailData.subject, text: emailData.text, html: emailData.html }),
+    })
 
-    // In a real application, you would use an email service like SendGrid here
-    // For now, we'll just log that the email would be sent
-    console.log(`[SERVER ACTION] Email would be sent to ${userEmail} in production`)
-
-    return {
-      success: true,
-      message: `Rejection email sent to ${userEmail}`,
+    if (!res.ok) {
+      logEmailDetails(emailData)
+      console.warn("/api/email/send failed, logged instead.")
+      return { success: false, message: "Failed to send via API route; logged instead." }
     }
+
+    const data = await res.json()
+    return { success: true, message: `Rejection email sent to ${userEmail}`, id: data?.id || null }
   } catch (error) {
     console.error("Error sending rejection email:", error)
     return {
@@ -133,17 +133,20 @@ export async function sendNotificationEmail(userEmail, subject, message) {
       `,
     }
 
-    // Log email details
-    logEmailDetails(emailData)
+    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ""}/api/email/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: emailData.to, subject: emailData.subject, text: emailData.text, html: emailData.html }),
+    })
 
-    // In a real application, you would use an email service like SendGrid here
-    // For now, we'll just log that the email would be sent
-    console.log(`[SERVER ACTION] Email would be sent to ${userEmail} in production`)
-
-    return {
-      success: true,
-      message: `Notification email sent to ${userEmail}`,
+    if (!res.ok) {
+      logEmailDetails(emailData)
+      console.warn("/api/email/send failed, logged instead.")
+      return { success: false, message: "Failed to send via API route; logged instead." }
     }
+
+    const data = await res.json()
+    return { success: true, message: `Notification email sent to ${userEmail}`, id: data?.id || null }
   } catch (error) {
     console.error("Error sending notification email:", error)
     return {

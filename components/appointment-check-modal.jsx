@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { X, AlertCircle, CheckCircle, Calendar } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { AlertCircle, CheckCircle, Calendar, Stethoscope, ArrowRight } from "lucide-react"
 import { checkPatientConsultation } from "@/lib/prescription-utils"
 
 export function AppointmentCheckModal({ isOpen, onClose, doctorId, patientId, onVerified }) {
@@ -9,10 +9,13 @@ export function AppointmentCheckModal({ isOpen, onClose, doctorId, patientId, on
   const [hasConsulted, setHasConsulted] = useState(false)
   const [message, setMessage] = useState("")
   const [isVisible, setIsVisible] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
+  const modalRef = useRef(null)
 
   useEffect(() => {
     if (isOpen) {
       setIsVisible(true)
+      setIsClosing(false)
       checkConsultation()
     } else {
       const timer = setTimeout(() => {
@@ -39,120 +42,209 @@ export function AppointmentCheckModal({ isOpen, onClose, doctorId, patientId, on
     }
   }
 
-  const handleClose = () => {
-    const backdrop = document.getElementById("appointment-check-backdrop")
-    const modalContent = document.getElementById("appointment-check-content")
-
-    if (backdrop) backdrop.style.animation = "fadeOut 0.3s ease-in-out forwards"
-    if (modalContent) modalContent.style.animation = "scaleOut 0.3s ease-in-out forwards"
-
+  const handleClose = async () => {
+    setIsClosing(true)
     setTimeout(() => {
       onClose()
-    }, 280)
+      setIsClosing(false)
+    }, 300)
   }
 
   const handleContinue = () => {
     if (hasConsulted && onVerified) {
-      onVerified()
-    } else {
-      handleClose()
+      setIsClosing(true)
+      setTimeout(() => {
+        onVerified()
+        setIsClosing(false)
+      }, 300)
     }
   }
 
+  // Handle escape key press
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape" && isOpen) {
+        handleClose()
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape)
+    return () => document.removeEventListener("keydown", handleEscape)
+  }, [isOpen])
+
+  // Prevent scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden"
+    } else {
+      document.body.style.overflow = "auto"
+    }
+
+    return () => {
+      document.body.style.overflow = "auto"
+    }
+  }, [isOpen])
+
   if (!isOpen && !isVisible) return null
 
-  return (
-    <>
-      {/* Backdrop with animation */}
-      <div
-        id="appointment-check-backdrop"
-        className="fixed inset-0 z-50 bg-black/50 transition-opacity"
-        onClick={handleClose}
-        style={{ animation: "fadeIn 0.3s ease-in-out" }}
-      />
+  const bgGradient = "bg-gradient-to-br from-soft-amber/10 to-yellow-50"
+  const iconColor = "bg-soft-amber/20 text-soft-amber"
 
-      {/* Modal with animation */}
+  return (
+    <div
+      className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm ${isClosing ? "animate-fade-out" : "animate-fade-in"}`}
+    >
       <div
-        id="appointment-check-content"
-        className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white shadow-lg"
-        style={{ animation: "scaleIn 0.3s ease-in-out" }}
+        ref={modalRef}
+        className={`w-full max-w-md mx-auto rounded-2xl bg-white shadow-2xl overflow-hidden ${isClosing ? "animate-modal-out" : "animate-modal-in"} ${bgGradient}`}
       >
-        <div className="flex items-center justify-between border-b border-pale-stone p-4">
-          <h2 className="text-xl font-semibold text-graphite">Consultation Check</h2>
-          <button
-            onClick={handleClose}
-            className="rounded-full p-2 text-drift-gray transition-colors hover:bg-pale-stone hover:text-soft-amber"
-          >
-            <X className="h-5 w-5" />
-            <span className="sr-only">Close</span>
-          </button>
+        <style jsx>{`
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+            }
+            to {
+              opacity: 1;
+            }
+          }
+          @keyframes fadeOut {
+            from {
+              opacity: 1;
+            }
+            to {
+              opacity: 0;
+            }
+          }
+          @keyframes modalIn {
+            from {
+              opacity: 0;
+              transform: scale(0.9) translateY(-20px);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1) translateY(0);
+            }
+          }
+          @keyframes modalOut {
+            from {
+              opacity: 1;
+              transform: scale(1) translateY(0);
+            }
+            to {
+              opacity: 0;
+              transform: scale(0.9) translateY(20px);
+            }
+          }
+          .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+          }
+          .animate-fade-out {
+            animation: fadeOut 0.3s ease-out;
+          }
+          .animate-modal-in {
+            animation: modalIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          }
+          .animate-modal-out {
+            animation: modalOut 0.3s ease-in;
+          }
+        `}</style>
+
+        {/* Header with gradient background */}
+        <div className={`${bgGradient} p-6 sm:p-8 relative overflow-hidden`}>
+          <div className="relative z-10">
+            <div className="flex items-center justify-center mb-3 sm:mb-4">
+              <div className={`flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full ${iconColor}`}>
+                <Stethoscope className="h-8 w-8 sm:h-10 sm:w-10" />
+              </div>
+            </div>
+            {loading ? (
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-graphite text-center mb-1 sm:mb-2">
+                Checking Consultation...
+              </h2>
+            ) : hasConsulted ? (
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-graphite text-center mb-1 sm:mb-2">
+                Consultation Verified ✓
+              </h2>
+            ) : (
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-graphite text-center mb-1 sm:mb-2">
+                Consultation Required
+              </h2>
+            )}
+          </div>
+
+          {/* Decorative circles */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12"></div>
         </div>
 
-        <div className="p-6">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-soft-amber border-t-transparent"></div>
-              <span className="ml-3 text-drift-gray">Checking consultation status...</span>
-            </div>
-          ) : hasConsulted ? (
-            <div className="rounded-lg bg-green-50 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-green-800">Consultation Verified</h3>
-                  <div className="mt-2 text-sm text-green-700">
-                    <p>You have consulted with this patient. You can proceed with creating a prescription.</p>
+        {/* Content */}
+        <div className="p-4 sm:p-6 md:p-8">
+          <div className="space-y-3 sm:space-y-4">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-4 sm:py-8">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 animate-spin rounded-full border-4 border-soft-amber border-t-transparent mb-3 sm:mb-4"></div>
+                <p className="text-center text-xs sm:text-sm md:text-base text-drift-gray">
+                  Checking consultation status...
+                </p>
+              </div>
+            ) : hasConsulted ? (
+              <div className="rounded-lg bg-green-50 border border-green-100 p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center">
+                  <div className="flex-shrink-0 mb-3 sm:mb-0 sm:mr-3">
+                    <CheckCircle className="h-6 w-6 sm:h-7 sm:w-7 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm sm:text-base font-medium text-green-800 mb-1 sm:mb-2">
+                      Consultation Verified
+                    </h3>
+                    <p className="text-xs sm:text-sm text-green-700">
+                      You have consulted with this patient. You can proceed with creating a prescription.
+                    </p>
                   </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="rounded-lg bg-amber-50 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <AlertCircle className="h-5 w-5 text-amber-600" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-amber-800">Consultation Required</h3>
-                  <div className="mt-2 text-sm text-amber-700">
-                    <p>
+            ) : (
+              <div className="rounded-lg bg-amber-50 border border-amber-100 p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center">
+                  <div className="flex-shrink-0 mb-3 sm:mb-0 sm:mr-3">
+                    <AlertCircle className="h-6 w-6 sm:h-7 sm:w-7 text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm sm:text-base font-medium text-amber-800 mb-1 sm:mb-2">
+                      Consultation Required
+                    </h3>
+                    <p className="text-xs sm:text-sm text-amber-700">
                       You need to have a consultation with this patient before creating a prescription. Please schedule
                       an appointment first.
                     </p>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
-              onClick={handleClose}
-              className="rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
-            >
-              Cancel
-            </button>
-            {hasConsulted ? (
-              <button
-                onClick={handleContinue}
-                className="rounded-md bg-soft-amber px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600"
-              >
-                Continue
-              </button>
-            ) : (
-              <button
-                onClick={handleClose}
-                className="inline-flex items-center rounded-md bg-soft-amber px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600"
-              >
-                <Calendar className="mr-2 h-4 w-4" />
-                Schedule Appointment
-              </button>
             )}
+
+            {/* Action Button */}
+            <div className="pt-2 sm:pt-4">
+              {hasConsulted ? (
+                <button
+                  onClick={handleContinue}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-soft-amber px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-semibold text-graphite shadow-lg hover:bg-soft-amber/90 transition-all duration-200 hover:shadow-xl"
+                >
+                  Continue to Prescription
+                  <ArrowRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={handleClose}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-soft-amber px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-semibold text-graphite shadow-lg hover:bg-soft-amber/90 transition-all duration-200 hover:shadow-xl"
+                >
+                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  Schedule Appointment
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

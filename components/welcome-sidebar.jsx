@@ -1,12 +1,14 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useMobile } from "@/hooks/use-mobile"
+import { SignupModal } from "@/components/signup-modal"
 
-export function WelcomeSidebar({ open, onOpenChange }) {
+export function WelcomeSidebar({ open, onOpenChange, onSignIn }) {
   const isMobile = useMobile()
   const dropdownRef = useRef(null)
+  const [showSignupModal, setShowSignupModal] = useState(false)
 
   // Handle escape key press
   useEffect(() => {
@@ -72,20 +74,24 @@ export function WelcomeSidebar({ open, onOpenChange }) {
           </ul>
 
           <div className="mt-6 grid grid-cols-2 gap-4 py-4 border-t border-earth-beige/30">
-            <Link
-              href="/login"
+            <button
+              onClick={() => {
+                onOpenChange(false)
+                onSignIn()
+              }}
               className="block w-full rounded-md border border-earth-beige bg-white px-4 py-2.5 text-center text-base font-medium text-graphite transition-colors hover:bg-pale-stone"
-              onClick={() => onOpenChange(false)}
             >
               Sign In
-            </Link>
-            <Link
-              href="/signup"
+            </button>
+            <button
+              onClick={() => {
+                onOpenChange(false)
+                setShowSignupModal(true)
+              }}
               className="block w-full rounded-md bg-soft-amber px-4 py-2.5 text-center text-base font-medium text-white transition-colors hover:bg-soft-amber/90"
-              onClick={() => onOpenChange(false)}
             >
               Sign Up
-            </Link>
+            </button>
           </div>
         </nav>
       </div>
@@ -99,6 +105,8 @@ export function WelcomeSidebar({ open, onOpenChange }) {
           aria-hidden="true"
         />
       )}
+
+      <SignupModal isOpen={showSignupModal} onClose={() => setShowSignupModal(false)} />
     </>
   )
 }

@@ -94,13 +94,14 @@ export function SuccessNotification({
 
   const styles = getTypeStyles()
 
-  // Determine position styling
+  // Determine position styling - add spacing for top navigation (64px = h-16)
+  // Use top-20 (5rem = 80px) to account for nav bar height + padding
   const getPositionStyles = () => {
     switch (position) {
       case "top-left":
-        return "top-4 left-4"
+        return "top-20 left-4 sm:top-24"
       case "top-center":
-        return "top-4 left-1/2 -translate-x-1/2"
+        return "top-20 left-1/2 -translate-x-1/2 sm:top-24"
       case "bottom-right":
         return "bottom-4 right-4"
       case "bottom-left":
@@ -109,28 +110,55 @@ export function SuccessNotification({
         return "bottom-4 left-1/2 -translate-x-1/2"
       case "top-right":
       default:
-        return "top-4 right-4"
+        return "top-20 right-4 sm:top-24"
     }
   }
 
   return (
     <div
-      className={`fixed ${getPositionStyles()} z-50 max-w-md transform transition-all duration-300 ${
-        isClosing ? "translate-y-[-10px] opacity-0" : "translate-y-0 opacity-100"
+      className={`fixed ${getPositionStyles()} z-50 max-w-md transform transition-all duration-500 ease-out ${
+        isClosing 
+          ? "translate-y-[-20px] opacity-0 scale-95" 
+          : "translate-y-0 opacity-100 scale-100"
       }`}
       role="alert"
       aria-live="assertive"
+      style={{
+        animation: isShowing && !isClosing 
+          ? "slideInFromTop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards, bounce 0.6s 0.3s ease-out forwards"
+          : undefined
+      }}
     >
+      <style jsx>{`
+        @keyframes slideInFromTop {
+          from {
+            opacity: 0;
+            transform: translateY(-30px) scale(0.9);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes bounce {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-8px);
+          }
+        }
+      `}</style>
       <div
-        className={`rounded-lg shadow-lg p-4 flex items-start space-x-3 ${styles.bgColor} border ${styles.borderColor}`}
+        className={`rounded-lg shadow-xl p-4 flex items-start space-x-3 ${styles.bgColor} border-2 ${styles.borderColor} backdrop-blur-sm transition-all duration-300 hover:shadow-2xl`}
       >
-        <div className={`flex-shrink-0 ${styles.iconColor}`}>{styles.icon}</div>
+        <div className={`flex-shrink-0 ${styles.iconColor} animate-pulse`} style={{ animation: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite" }}>{styles.icon}</div>
         <div className="flex-1">
-          <p className={`text-sm font-medium ${styles.textColor}`}>{message}</p>
+          <p className={`text-sm font-medium ${styles.textColor} leading-relaxed`}>{message}</p>
         </div>
         <button
           onClick={handleClose}
-          className={`flex-shrink-0 ml-1 ${styles.iconColor} ${styles.hoverColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${type === "success" ? "green" : type === "error" ? "red" : type === "warning" ? "amber" : "blue"}-500 rounded`}
+          className={`flex-shrink-0 ml-1 ${styles.iconColor} ${styles.hoverColor} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${type === "success" ? "green" : type === "error" ? "red" : type === "warning" ? "amber" : "blue"}-500 rounded transition-transform duration-200 hover:scale-110`}
           aria-label="Close notification"
         >
           <X className="h-4 w-4" />

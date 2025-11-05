@@ -19,6 +19,8 @@ import { PrescriptionTemplate } from "@/components/prescription-template"
 import { AppointmentCheckModal } from "@/components/appointment-check-modal"
 import { SuccessNotification } from "@/components/success-notification"
 import { SignaturePad } from "@/components/signature-pad"
+import { Combobox } from "@/components/combobox"
+import { PrescriptionPreviewTemplate } from "@/components/prescription-preview-templates"
 import {
   savePrescriptionTemplate,
   generatePrintablePrescription,
@@ -36,13 +38,12 @@ export default function NewPrescriptionPage() {
   const [showAppointmentCheck, setShowAppointmentCheck] = useState(false)
   const [appointmentVerified, setAppointmentVerified] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
-  const [saveAsTemplate, setSaveAsTemplate] = useState(false)
-  const [templateName, setTemplateName] = useState("")
   const [signature, setSignature] = useState(null)
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [patients, setPatients] = useState([])
   const [doctorInfo, setDoctorInfo] = useState(null)
   const [dataLoading, setDataLoading] = useState(true)
+  const [prescriptionTemplate, setPrescriptionTemplate] = useState("classic") // classic, modern, compact
 
   // Form state
   const [formData, setFormData] = useState({
@@ -50,6 +51,7 @@ export default function NewPrescriptionPage() {
     patientName: "",
     patientAge: "",
     patientGender: "",
+    patientAddress: "",
     medications: [
       {
         name: "",
@@ -171,8 +173,12 @@ export default function NewPrescriptionPage() {
             licenseNumber: doctorData.licenseNumber || "N/A",
             clinicAddress: doctorData.officeAddress || "N/A",
             contactNumber: doctorData.phone || doctorData.contactNumber || "+63 XXX XXX XXXX",
+            email: doctorData.email || user.email || "",
             ptrNumber: doctorData.ptrNumber || "N/A",
             s2Number: doctorData.s2Number || "N/A",
+            hospitalName: doctorData.hospitalName || doctorData.clinicName || doctorData.institutionName || "",
+            province: doctorData.province || "",
+            healthOffice: doctorData.healthOffice || "",
           })
         }
 
@@ -192,19 +198,37 @@ export default function NewPrescriptionPage() {
   }, [user])
 
   // Handle patient selection
-  const handlePatientChange = (e) => {
+  const handlePatientChange = async (e) => {
     const patientId = e.target.value
     if (patientId) {
       const selectedPatient = patients.find((p) => p.id === patientId)
       if (selectedPatient) {
-        setFormData({
-          ...formData,
-          patientId,
-          patientName: selectedPatient.name,
-          patientAge: selectedPatient.age,
-          patientGender: selectedPatient.gender,
-          patientBirthdate: selectedPatient.birthdate,
-        })
+        // Fetch full patient data including address
+        try {
+          const { getUserProfile } = await import("@/lib/firebase-utils")
+          const patientData = await getUserProfile(patientId)
+          
+          setFormData({
+            ...formData,
+            patientId,
+            patientName: selectedPatient.name,
+            patientAge: selectedPatient.age,
+            patientGender: selectedPatient.gender,
+            patientBirthdate: selectedPatient.birthdate,
+            patientAddress: patientData?.address || "",
+          })
+        } catch (error) {
+          console.error("Error fetching patient data:", error)
+          setFormData({
+            ...formData,
+            patientId,
+            patientName: selectedPatient.name,
+            patientAge: selectedPatient.age,
+            patientGender: selectedPatient.gender,
+            patientBirthdate: selectedPatient.birthdate,
+            patientAddress: "",
+          })
+        }
 
         // Only show appointment check modal if doctorInfo is available
         if (doctorInfo) {
@@ -225,6 +249,7 @@ export default function NewPrescriptionPage() {
         patientAge: "",
         patientGender: "",
         patientBirthdate: "",
+        patientAddress: "",
       })
       setAppointmentVerified(false)
     }
@@ -318,6 +343,7 @@ export default function NewPrescriptionPage() {
         doctorName: doctorInfo.name,
         doctorSpecialty: doctorInfo.specialty,
         doctorLicenseNumber: doctorInfo.licenseNumber,
+        template: prescriptionTemplate, // Save the selected template format
         status: "active",
         startDate: new Date().toISOString().split("T")[0],
         // Calculate end date based on the longest medication duration
@@ -332,16 +358,6 @@ export default function NewPrescriptionPage() {
         throw new Error(result.message || "Failed to save prescription")
       }
 
-      // If saving as template
-      if (saveAsTemplate && templateName) {
-        await savePrescriptionTemplate(
-          {
-            name: templateName,
-            medications: formData.medications,
-          },
-          user.uid,
-        )
-      }
 
       // Show success notification
       setNotification({
@@ -355,6 +371,7 @@ export default function NewPrescriptionPage() {
         patientName: "",
         patientAge: "",
         patientGender: "",
+        patientAddress: "",
         medications: [
           {
             name: "",
@@ -368,8 +385,6 @@ export default function NewPrescriptionPage() {
         signature: null,
       })
       setAppointmentVerified(false)
-      setSaveAsTemplate(false)
-      setTemplateName("")
 
       // Just show success notification, don't show template modal
       setTimeout(() => {
@@ -517,10 +532,14 @@ export default function NewPrescriptionPage() {
     return formData.medications.every((med) => med.name && med.dosage && med.frequency && med.duration)
   }
 
-  // Helper function to format date
+  // Helper function to format date (MM/DD/YYYY)
   const formatDate = (date) => {
-    const options = { year: "numeric", month: "long", day: "numeric" }
-    return date.toLocaleDateString(undefined, options)
+    if (!date) return new Date().toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
+    const d = new Date(date)
+    const month = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    const year = d.getFullYear()
+    return `${month}/${day}/${year}`
   }
 
   return (
@@ -554,36 +573,147 @@ export default function NewPrescriptionPage() {
         </div>
       </div>
 
+      {/* Prescription Template Selection - At the top */}
+      <div className="mb-6 rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-graphite">Prescription Format</h2>
+          <p className="mt-1 text-sm text-drift-gray">Choose your preferred prescription layout</p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => setPrescriptionTemplate("classic")}
+            className={`rounded-lg border-2 p-4 text-left transition-all ${
+              prescriptionTemplate === "classic"
+                ? "border-soft-amber bg-soft-amber/10 shadow-md"
+                : "border-earth-beige hover:border-soft-amber/50"
+            }`}
+          >
+            <div className="font-medium text-graphite">Classic</div>
+            <div className="mt-1 text-xs text-drift-gray">Traditional format</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPrescriptionTemplate("modern")}
+            className={`rounded-lg border-2 p-4 text-left transition-all ${
+              prescriptionTemplate === "modern"
+                ? "border-soft-amber bg-soft-amber/10 shadow-md"
+                : "border-earth-beige hover:border-soft-amber/50"
+            }`}
+          >
+            <div className="font-medium text-graphite">Modern</div>
+            <div className="mt-1 text-xs text-drift-gray">Clean layout</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPrescriptionTemplate("compact")}
+            className={`rounded-lg border-2 p-4 text-left transition-all ${
+              prescriptionTemplate === "compact"
+                ? "border-soft-amber bg-soft-amber/10 shadow-md"
+                : "border-earth-beige hover:border-soft-amber/50"
+            }`}
+          >
+            <div className="font-medium text-graphite">Compact</div>
+            <div className="mt-1 text-xs text-drift-gray">Space efficient</div>
+          </button>
+        </div>
+      </div>
+
+      {/* Patient Selection - Mobile only, below format selector */}
+      <div className="mb-6 lg:hidden rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-graphite">Patient Information</h2>
+          <p className="mt-1 text-sm text-drift-gray">Select a patient to populate their information</p>
+        </div>
+        <div>
+          <label htmlFor="patientId-mobile" className="block text-sm font-medium text-graphite mb-2">
+            Select Patient <span className="text-red-500">*</span>
+          </label>
+          <Combobox
+            id="patientId-mobile"
+            options={patients
+              .filter((patient) => patient && patient.id && patient.name)
+              .map((patient) => patient.name)}
+            value={formData.patientName || ""}
+            onChange={(value) => {
+              const selectedPatient = patients.find(
+                (p) => p && p.name === value && p.id
+              )
+              if (selectedPatient) {
+                const syntheticEvent = {
+                  target: { value: selectedPatient.id },
+                }
+                handlePatientChange(syntheticEvent)
+              }
+            }}
+            placeholder="Select or search patient name"
+            required
+            className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+          />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Form */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 order-2 lg:order-1">
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Patient Information */}
-            <div className="rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-medium text-graphite">Patient Information</h2>
+            <div className="rounded-lg border-2 border-earth-beige bg-gradient-to-br from-white to-blue-50/30 p-6 shadow-sm lg:block">
+              <div className="mb-6 hidden lg:block">
+                <h2 className="text-lg font-semibold text-graphite">Patient Information</h2>
+                <p className="mt-1 text-sm text-drift-gray">Select a patient to populate their information</p>
+              </div>
+              {/* Mobile Header with Verification */}
+              <div className="mb-6 lg:hidden">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-graphite">Patient Details</h2>
+                  {/* Verification Status - Mobile only, beside title */}
+                  {formData.patientId && (
+                    <div>
+                      {appointmentVerified ? (
+                        <div className="flex items-center gap-1 rounded-full bg-green-50 px-3 py-1">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <span className="text-xs font-medium text-green-800">Verified</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1">
+                          <AlertCircle className="h-4 w-4 text-amber-600" />
+                          <span className="text-xs font-medium text-amber-800">Required</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* Patient Selection - Desktop only */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 hidden lg:grid">
                   <div>
                     <label htmlFor="patientId" className="block text-sm font-medium text-graphite">
                       Select Patient <span className="text-red-500">*</span>
                     </label>
-                    <select
+                    <Combobox
                       id="patientId"
-                      value={formData.patientId}
-                      onChange={handlePatientChange}
-                      className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+                      options={patients
+                        .filter((patient) => patient && patient.id && patient.name)
+                        .map((patient) => patient.name)}
+                      value={formData.patientName || ""}
+                      onChange={(value) => {
+                        const selectedPatient = patients.find(
+                          (p) => p && p.name === value && p.id
+                        )
+                        if (selectedPatient) {
+                          const syntheticEvent = {
+                            target: { value: selectedPatient.id },
+                          }
+                          handlePatientChange(syntheticEvent)
+                        }
+                      }}
+                      placeholder="Select or search patient name"
                       required
-                    >
-                      <option value="">Select a patient</option>
-                      {patients.map((patient, index) =>
-                        patient && patient.id ? (
-                          <option key={`patient-${patient.id}-${index}`} value={patient.id}>
-                            {patient.name}
-                          </option>
-                        ) : null,
-                      )}
-                    </select>
+                      className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+                    />
                   </div>
                 </div>
 
@@ -615,32 +745,61 @@ export default function NewPrescriptionPage() {
               </div>
             </div>
 
+            {/* Live Prescription Preview - Mobile only, below Patient Information */}
+            {formData.patientId && (
+              <div className="lg:hidden rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-lg font-medium text-graphite">Prescription Preview</h2>
+                <p className="mb-4 text-sm text-drift-gray">Live preview of your prescription</p>
+
+                <div className="mb-6 overflow-hidden rounded-lg border-2 border-gray-200 bg-white shadow-lg relative">
+                  <div className="p-6 bg-white relative max-w-lg mx-auto">
+                    <PrescriptionPreviewTemplate
+                      template={prescriptionTemplate}
+                      formData={formData}
+                      doctorInfo={doctorInfo}
+                      formatDate={formatDate}
+                      isMobile={true}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Medications */}
             <div className="rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-medium text-graphite">Medications</h2>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-graphite">Medications</h2>
+                  <p className="mt-1 text-sm text-drift-gray">Add medications and their details</p>
+                </div>
                 <button
                   type="button"
                   onClick={addMedication}
-                  className="inline-flex items-center rounded-md bg-soft-amber px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-amber-600"
+                  className="inline-flex items-center rounded-md bg-soft-amber px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-amber-600 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
                 >
-                  <Plus className="mr-1 h-4 w-4" />
+                  <Plus className="mr-2 h-4 w-4" />
                   Add Medication
                 </button>
               </div>
 
               <div className="space-y-6">
                 {formData.medications.map((medication, index) => (
-                  <div key={index} className="rounded-lg border border-earth-beige p-4">
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="font-medium text-graphite">Medication #{index + 1}</h3>
+                  <div key={index} className="rounded-lg border-2 border-pale-stone bg-gradient-to-br from-white to-pale-stone/20 p-5 shadow-sm transition-all hover:shadow-md hover:border-soft-amber/30">
+                    <div className="mb-4 flex items-center justify-between pb-3 border-b border-earth-beige">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-soft-amber/20 to-soft-amber/10 text-soft-amber shadow-sm">
+                          <span className="text-sm font-bold">{index + 1}</span>
+                        </div>
+                        <h3 className="font-semibold text-graphite text-base">Medication {index + 1}</h3>
+                      </div>
                       {formData.medications.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeMedication(index)}
-                          className="rounded-full p-1 text-drift-gray hover:bg-pale-stone hover:text-graphite"
+                          className="rounded-md p-2 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                          title="Remove medication"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-5 w-5" />
                         </button>
                       )}
                     </div>
@@ -650,20 +809,15 @@ export default function NewPrescriptionPage() {
                         <label htmlFor={`medication-${index}`} className="block text-sm font-medium text-graphite">
                           Medication Name <span className="text-red-500">*</span>
                         </label>
-                        <select
+                        <Combobox
                           id={`medication-${index}`}
+                          options={medicationOptions}
                           value={medication.name}
-                          onChange={(e) => handleMedicationChange(index, "name", e.target.value)}
-                          className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+                          onChange={(value) => handleMedicationChange(index, "name", value)}
+                          placeholder="Select or type medication name"
                           required
-                        >
-                          <option value="">Select medication</option>
-                          {medicationOptions.map((med) => (
-                            <option key={med} value={med}>
-                              {med}
-                            </option>
-                          ))}
-                        </select>
+                          className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+                        />
                       </div>
                       <div>
                         <label htmlFor={`dosage-${index}`} className="block text-sm font-medium text-graphite">
@@ -682,39 +836,29 @@ export default function NewPrescriptionPage() {
                         <label htmlFor={`frequency-${index}`} className="block text-sm font-medium text-graphite">
                           Frequency <span className="text-red-500">*</span>
                         </label>
-                        <select
+                        <Combobox
                           id={`frequency-${index}`}
+                          options={frequencyOptions}
                           value={medication.frequency}
-                          onChange={(e) => handleMedicationChange(index, "frequency", e.target.value)}
-                          className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+                          onChange={(value) => handleMedicationChange(index, "frequency", value)}
+                          placeholder="Select or type frequency"
                           required
-                        >
-                          <option value="">Select frequency</option>
-                          {frequencyOptions.map((freq) => (
-                            <option key={freq} value={freq}>
-                              {freq}
-                            </option>
-                          ))}
-                        </select>
+                          className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+                        />
                       </div>
                       <div>
                         <label htmlFor={`duration-${index}`} className="block text-sm font-medium text-graphite">
                           Duration <span className="text-red-500">*</span>
                         </label>
-                        <select
+                        <Combobox
                           id={`duration-${index}`}
+                          options={durationOptions}
                           value={medication.duration}
-                          onChange={(e) => handleMedicationChange(index, "duration", e.target.value)}
-                          className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+                          onChange={(value) => handleMedicationChange(index, "duration", value)}
+                          placeholder="Select or type duration"
                           required
-                        >
-                          <option value="">Select duration</option>
-                          {durationOptions.map((dur) => (
-                            <option key={dur} value={dur}>
-                              {dur}
-                            </option>
-                          ))}
-                        </select>
+                          className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+                        />
                       </div>
                       <div className="sm:col-span-2">
                         <label htmlFor={`instructions-${index}`} className="block text-sm font-medium text-graphite">
@@ -735,67 +879,41 @@ export default function NewPrescriptionPage() {
             </div>
 
             {/* Doctor's Signature */}
-            <div className="rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-medium text-graphite">
+            <div className="rounded-lg border-2 border-earth-beige bg-gradient-to-br from-white to-amber-50/30 p-6 shadow-sm">
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-graphite">
                 Doctor's Signature <span className="text-red-500">*</span>
               </h2>
-              <p className="mb-4 text-sm text-drift-gray">Please sign below to authorize this prescription</p>
+                <p className="mt-1 text-sm text-drift-gray">Please sign below to authorize this prescription</p>
+              </div>
 
               <SignaturePad onChange={handleSignatureChange} initialSignature={formData.signature} />
             </div>
 
             {/* Additional Notes */}
             <div className="rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
-              <h2 className="mb-4 text-lg font-medium text-graphite">Additional Notes</h2>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-graphite">Additional Notes</h2>
+                <p className="mt-1 text-sm text-drift-gray">Add any additional notes or instructions for this prescription</p>
+              </div>
               <div>
-                <label htmlFor="notes" className="block text-sm font-medium text-graphite">
+                <label htmlFor="notes" className="block text-sm font-medium text-graphite mb-2">
                   Notes
                 </label>
                 <textarea
                   id="notes"
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={3}
-                  className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+                  rows={4}
+                  placeholder="Enter any additional notes or instructions..."
+                  className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite placeholder:text-drift-gray/50 focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber transition-colors"
                 />
+                {formData.notes && (
+                  <p className="mt-2 text-xs text-drift-gray">
+                    {formData.notes.length} character{formData.notes.length !== 1 ? 's' : ''}
+                  </p>
+                )}
               </div>
-            </div>
-
-            {/* Save as Template */}
-            <div className="rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
-              <div className="flex items-start">
-                <div className="flex h-5 items-center">
-                  <input
-                    id="saveAsTemplate"
-                    type="checkbox"
-                    checked={saveAsTemplate}
-                    onChange={(e) => setSaveAsTemplate(e.target.checked)}
-                    className="h-4 w-4 rounded border-earth-beige text-soft-amber focus:ring-soft-amber"
-                  />
-                </div>
-                <div className="ml-3">
-                  <label htmlFor="saveAsTemplate" className="text-sm font-medium text-graphite">
-                    Save as Template
-                  </label>
-                  <p className="text-xs text-drift-gray">Save this prescription as a template for future use</p>
-                </div>
-              </div>
-
-              {saveAsTemplate && (
-                <div className="mt-4">
-                  <label htmlFor="templateName" className="block text-sm font-medium text-graphite">
-                    Template Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    id="templateName"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
-                    required={saveAsTemplate}
-                  />
-                </div>
-              )}
             </div>
 
             {/* Form Actions */}
@@ -837,9 +955,9 @@ export default function NewPrescriptionPage() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Consultation Status */}
-          <div className="rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
+        <div className="space-y-6 order-1 lg:order-2">
+          {/* Consultation Status - Desktop only */}
+          <div className="hidden lg:block rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-medium text-graphite">Consultation Status</h2>
 
             {!formData.patientId ? (
@@ -881,80 +999,21 @@ export default function NewPrescriptionPage() {
             )}
           </div>
 
-          {/* Prescription Preview */}
+          {/* Prescription Preview - Desktop only */}
           {formData.patientId && (
-            <div className="rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
+            <div className="hidden lg:block rounded-lg border border-earth-beige bg-white p-6 shadow-sm">
               <h2 className="mb-4 text-lg font-medium text-graphite">Prescription Preview</h2>
               <p className="mb-4 text-sm text-drift-gray">Live preview of your prescription</p>
 
-              <div className="mb-6 overflow-hidden rounded-lg border border-earth-beige bg-white shadow-sm">
-                <div className="p-6">
-                  <div className="relative border-b border-gray-300 pb-4 text-center">
-                    <div className="absolute left-0 top-0 text-2xl font-bold italic text-soft-amber">Rx</div>
-                    <div className="doctor-info">
-                      <div className="text-lg font-bold">Dr. {doctorInfo?.name || "Doctor Name"}</div>
-                      <div className="text-sm">
-                        {doctorInfo?.specialty || "Specialty"} | PRC #{doctorInfo?.licenseNumber || "License"}
-                      </div>
-                      <div className="text-sm">{doctorInfo?.clinicAddress || "Clinic Address"}</div>
-                      <div className="text-sm">Contact No.: {doctorInfo?.contactNumber || "Contact Number"}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-2">
-                    <div>Date: {formatDate(new Date())}</div>
-                    <div>Patient Name: {formData.patientName || "_______________________"}</div>
-                    <div>
-                      Age: {formData.patientAge || "____"} &nbsp;&nbsp; Sex: {formData.patientGender || "____"}
-                    </div>
-                  </div>
-
-                  <div className="mt-6">
-                    <div className="text-lg font-bold text-soft-amber">Rx:</div>
-
-                    <div className="mt-2 space-y-4">
-                      {formData.medications && formData.medications.length > 0 ? (
-                        formData.medications.map((med, index) => (
-                          <div key={index} className="ml-4">
-                            <div>
-                              <span className="font-bold">{index + 1}.</span> {med.name || "(No medication name)"}
-                            </div>
-                            <div className="ml-4">
-                              {med.dosage || "(No dosage)"}, {med.frequency || "(No frequency)"},{" "}
-                              {med.duration || "(No duration)"}
-                            </div>
-                            {med.instructions && (
-                              <div className="ml-4 italic text-drift-gray">({med.instructions})</div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="ml-4 text-drift-gray italic">(No medications added yet)</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-10 space-y-1 pt-10">
-                    {formData.signature ? (
-                      <div className="mb-2">
-                        <img
-                          src={formData.signature || "/placeholder.svg"}
-                          alt="Doctor's Signature"
-                          className="max-h-20"
-                        />
-                      </div>
-                    ) : (
-                      <div className="mb-4 border-b border-gray-400 w-48"></div>
-                    )}
-                    <div>Dr. {doctorInfo?.name || "Doctor Name"}</div>
-                    <div>License No.: PRC {doctorInfo?.licenseNumber || "License Number"}</div>
-                    <div>PTR No.: {doctorInfo?.ptrNumber || "PTR Number"}</div>
-                    <div>S2 No.: {doctorInfo?.s2Number || "S2 Number"}</div>
-                  </div>
-
-                  <div className="mt-8 border-t border-gray-300 pt-2 text-center text-xs text-gray-500">
-                    This prescription is electronically generated via Smart Care Health System
-                  </div>
+              <div className="mb-6 overflow-hidden rounded-lg border-2 border-gray-200 bg-white shadow-lg relative">
+                <div className="p-6 bg-white relative max-w-lg mx-auto">
+                  <PrescriptionPreviewTemplate
+                    template={prescriptionTemplate}
+                    formData={formData}
+                    doctorInfo={doctorInfo}
+                    formatDate={formatDate}
+                    isMobile={false}
+                  />
                 </div>
               </div>
             </div>

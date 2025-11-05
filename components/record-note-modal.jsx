@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { X, MessageSquare, Send, AlertCircle, Check } from "lucide-react"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { MessageSquare, Send, AlertCircle, Check } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { addDoctorNoteToRecord } from "@/lib/record-utils"
 
@@ -13,6 +13,20 @@ export function RecordNoteModal({ isOpen, onClose, record, onSuccess }) {
   const [success, setSuccess] = useState("")
   const [isVisible, setIsVisible] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
+  const isClosingRef = useRef(false)
+  const modalRef = useRef(null)
+
+  // Theme (match PatientRecordModal / Appointment modal)
+  const theme = {
+    headerBg: "bg-gradient-to-br from-soft-amber/10 to-yellow-50",
+    buttonBg: "bg-gradient-to-r from-soft-amber to-amber-500",
+    buttonHover: "hover:from-amber-500 hover:to-amber-600",
+    focusRing: "focus:ring-soft-amber",
+    borderColor: "border-amber-200",
+    accentColor: "text-soft-amber",
+    iconBg: "bg-soft-amber/20 text-soft-amber",
+    focusBorder: "focus:border-soft-amber",
+  }
 
   // Handle modal visibility with animation
   useEffect(() => {
@@ -22,18 +36,35 @@ export function RecordNoteModal({ isOpen, onClose, record, onSuccess }) {
     }
   }, [isOpen])
 
-  // Handle closing with animation
-  const handleClose = () => {
+  // Handle closing with animation (same behavior as PatientRecordModal)
+  const handleCloseWithAnimation = useCallback((e) => {
+    if (isClosingRef.current || isClosing) {
+      if (e) {
+        e.preventDefault()
+        e.stopPropagation()
+        e.stopImmediatePropagation?.()
+      }
+      return
+    }
+    isClosingRef.current = true
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation?.()
+    }
     setIsClosing(true)
-    setTimeout(() => {
+    try {
       onClose()
-      setIsVisible(false)
-      // Reset state after closing
-      setNote("")
-      setError("")
-      setSuccess("")
-    }, 300)
-  }
+    } catch (error) {
+      console.error("Error calling onClose:", error)
+      setIsClosing(false)
+      isClosingRef.current = false
+    }
+    // Reset state after closing
+    setNote("")
+    setError("")
+    setSuccess("")
+  }, [onClose, isClosing])
 
   // Handle submitting a note
   const handleSubmitNote = async (e) => {
@@ -66,7 +97,7 @@ export function RecordNoteModal({ isOpen, onClose, record, onSuccess }) {
       } else {
         // Close modal after success if no callback
         setTimeout(() => {
-          handleClose()
+          handleCloseWithAnimation()
         }, 2000)
       }
     } catch (error) {
@@ -81,107 +112,178 @@ export function RecordNoteModal({ isOpen, onClose, record, onSuccess }) {
 
   return (
     <>
-      {/* Backdrop with animation */}
       <div
-        className={`fixed inset-0 z-50 bg-black/50 transition-opacity duration-300 ${
-          isVisible ? "opacity-100" : "opacity-0"
-        } ${isClosing ? "opacity-0" : ""}`}
-        onClick={handleClose}
-      />
-
-      {/* Modal with animation */}
-      <div
-        className={`fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-lg transition-all duration-300 ${
-          isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
-        } ${isClosing ? "opacity-0 scale-95" : ""}`}
+        className={`fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-3 md:p-4 lg:p-4 bg-black/60 backdrop-blur-xl ${isClosing ? "animate-fade-out" : "animate-fade-in"} ${!isOpen && !isClosing ? "pointer-events-none opacity-0" : ""}`}
+        onClick={(e) => {
+          if (!isOpen || isClosing || isClosingRef.current || isSubmitting) {
+            e.preventDefault()
+            e.stopPropagation()
+            return
+          }
+          if (e.target !== e.currentTarget) {
+            e.stopPropagation()
+            return
+          }
+          handleCloseWithAnimation(e)
+        }}
+        onMouseDown={(e) => {
+          if (!isOpen || isClosing || isClosingRef.current || isSubmitting) {
+            e.preventDefault()
+            e.stopPropagation()
+            return
+          }
+          if (e.target === e.currentTarget) {
+            // Allow backdrop clicks
+          } else {
+            e.stopPropagation()
+          }
+        }}
+        style={{ backdropFilter: 'blur(16px)' }}
       >
-        <button
-          onClick={handleClose}
-          className="absolute right-4 top-4 rounded-full p-1 text-drift-gray hover:bg-pale-stone hover:text-soft-amber transition-colors duration-200"
+        <div
+          ref={modalRef}
+          className={`w-full max-w-md lg:max-w-2xl xl:max-w-3xl mx-auto rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] sm:max-h-[82vh] lg:max-h-[78vh] flex flex-col ${isClosing ? "animate-modal-out" : "animate-modal-in"} ${!isOpen && !isClosing ? "pointer-events-none opacity-0" : ""} ${theme.headerBg}`}
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => {
+            if (!isOpen || isClosing || isClosingRef.current || isSubmitting) {
+              e.preventDefault()
+              e.stopPropagation()
+              return
+            }
+            e.stopPropagation()
+            e.stopImmediatePropagation?.()
+          }}
+          onMouseDown={(e) => {
+            if (!isOpen || isClosing || isClosingRef.current || isSubmitting) {
+              e.preventDefault()
+              e.stopPropagation()
+              return
+            }
+            e.stopPropagation()
+          }}
         >
-          <X className="h-5 w-5" />
-          <span className="sr-only">Close</span>
-        </button>
+          <style jsx>{`
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+            @keyframes modalIn { from { opacity: 0; transform: scale(0.9) translateY(-20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+            @keyframes modalOut { from { opacity: 1; transform: scale(1) translateY(0); } to { opacity: 0; transform: scale(0.9) translateY(20px); } }
+            .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+            .animate-fade-out { animation: fadeOut 0.3s ease-out; }
+            .animate-modal-in { animation: modalIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+            .animate-modal-out { animation: modalOut 0.3s ease-in; }
+          `}</style>
 
-        <div className="flex items-center mb-4">
-          <MessageSquare className="h-6 w-6 text-soft-amber mr-2" />
-          <h2 className="text-xl font-bold text-graphite">Add Medical Note</h2>
+          {/* Header matching PatientRecordModal */}
+          <div className={`${theme.headerBg} p-2 sm:p-2.5 md:p-3 lg:p-3 relative overflow-hidden flex-shrink-0`}>
+            <div className="relative z-10 flex items-center gap-2 sm:gap-2.5">
+              <div className={`flex h-7 w-7 sm:h-8 sm:w-8 md:h-8 md:w-8 items-center justify-center rounded-full ${theme.iconBg} flex-shrink-0`}>
+                <MessageSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-4 md:w-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xs sm:text-sm md:text-base lg:text-base font-bold text-graphite">Add Medical Note</h2>
+                {record && (
+                  <p className="text-[10px] sm:text-xs md:text-sm text-drift-gray mt-0.5 truncate">
+                    {record.name || "Record"}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/20 rounded-full -mr-12 -mt-12"></div>
+            <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/20 rounded-full -ml-10 -mb-10"></div>
+          </div>
+
+          {/* Content */}
+          <div className="p-2.5 sm:p-3 md:p-3.5 lg:p-4 overflow-hidden flex-1 min-h-0 flex flex-col">
+            {error && (
+              <div className="rounded-lg border border-red-200/50 bg-red-50/80 backdrop-blur-sm p-2.5 sm:p-3 md:p-3 shadow-sm mb-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 sm:h-4 sm:w-4 md:h-5 md:w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs sm:text-xs md:text-sm text-red-700">{error}</p>
+                </div>
+              </div>
+            )}
+            {success && (
+              <div className="rounded-lg border border-green-200/60 bg-green-50/80 backdrop-blur-sm p-2.5 sm:p-3 md:p-3 shadow-sm mb-2">
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 sm:h-4 sm:w-4 md:h-5 md:w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs sm:text-xs md:text-sm text-green-700">{success}</p>
+                </div>
+              </div>
+            )}
+
+            {record && (
+              <div className="rounded-lg border border-amber-200/50 bg-white/80 backdrop-blur-sm p-2.5 sm:p-3 md:p-3 shadow-sm mb-2">
+                <p className="text-xs sm:text-xs md:text-sm font-semibold text-graphite">{record.name}</p>
+                <p className="text-[10px] sm:text-xs md:text-sm text-drift-gray mt-0.5">
+                  Type: {record.type} • Date: {record.date ? new Date(record.date).toLocaleDateString() : "N/A"}
+                </p>
+                <p className="text-[10px] sm:text-xs md:text-sm text-drift-gray mt-0.5">
+                  Patient: <span className="font-medium">{record.patientName || "Patient"}</span>
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-lg border border-amber-200/50 bg-white/80 backdrop-blur-sm p-2.5 sm:p-3 md:p-3 shadow-sm">
+              <label htmlFor="note" className="block mb-2 text-xs sm:text-sm font-semibold text-graphite">
+                Medical Note
+              </label>
+              <textarea
+                id="note"
+                rows={5}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Enter your medical observations or notes about this record..."
+                className="w-full rounded-md border-2 border-amber-200 bg-white/90 py-2 px-3 text-graphite placeholder:text-drift-gray/70 focus:border-soft-amber focus:outline-none focus:ring-2 focus:ring-soft-amber/40"
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          {/* Footer buttons match PatientRecordModal */}
+          <div className="p-2 sm:p-2.5 md:p-3 lg:p-3 border-t border-amber-200/30 bg-white/50 backdrop-blur-sm flex-shrink-0">
+            <form onSubmit={handleSubmitNote} className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-2.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  e.stopImmediatePropagation?.()
+                  if (!isClosingRef.current && !isClosing) {
+                    handleCloseWithAnimation(e)
+                  }
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  e.stopImmediatePropagation?.()
+                }}
+                disabled={isClosing || isClosingRef.current}
+                className="flex-1 sm:flex-none rounded-lg border-2 border-soft-amber/60 bg-white px-3 py-1.5 sm:px-4 sm:py-2 md:px-4 md:py-2 text-xs sm:text-sm font-semibold text-soft-amber shadow-sm hover:bg-soft-amber/10 hover:border-soft-amber hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={isSubmitting || isClosing || isClosingRef.current}
+                className={`flex-1 sm:flex-none inline-flex items-center justify-center gap-2 rounded-lg ${theme.buttonBg} px-3 py-1.5 sm:px-4 sm:py-2 md:px-4 md:py-2 text-xs sm:text-sm font-semibold text-white shadow-lg hover:shadow-xl ${theme.buttonHover} transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed`}
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4" />
+                    Add Note
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
         </div>
-
-        {record && (
-          <div className="mb-4 p-3 bg-pale-stone/30 rounded-md">
-            <p className="font-medium text-graphite">{record.name}</p>
-            <p className="text-sm text-drift-gray">
-              Type: {record.type} • Date: {new Date(record.date).toLocaleDateString()}
-            </p>
-            <p className="text-sm text-drift-gray mt-1">
-              Patient: <span className="font-medium">{record.patientName || "Patient"}</span>
-            </p>
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-4 rounded-md bg-red-50 p-3 text-red-700 animate-fadeIn">
-            <div className="flex">
-              <AlertCircle className="mr-2 h-5 w-5 flex-shrink-0" />
-              <span>{error}</span>
-            </div>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-4 rounded-md bg-green-50 p-3 text-green-700 animate-fadeIn">
-            <div className="flex">
-              <Check className="mr-2 h-5 w-5 flex-shrink-0" />
-              <span>{success}</span>
-            </div>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmitNote}>
-          <div className="mb-4">
-            <label htmlFor="note" className="block mb-2 text-sm font-medium text-graphite">
-              Medical Note
-            </label>
-            <textarea
-              id="note"
-              rows={4}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Enter your medical observations or notes about this record..."
-              className="w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite placeholder:text-drift-gray/60 focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
-              disabled={isSubmitting}
-            />
-          </div>
-
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handleClose}
-              className="mr-2 rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-md bg-soft-amber px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-amber-600 disabled:opacity-50"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Add Note
-                </>
-              )}
-            </button>
-          </div>
-        </form>
       </div>
     </>
   )

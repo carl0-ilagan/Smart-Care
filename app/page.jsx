@@ -10,9 +10,13 @@ import { HealthTipsCarousel } from "@/components/health-tips-carousel"
 import { WelcomeSidebar } from "@/components/welcome-sidebar"
 import { getLandingPageContent } from "@/lib/welcome-utils"
 import { Logo } from "@/components/logo"
+import { LoginModal } from "@/components/login-modal"
+import { SignupModal } from "@/components/signup-modal"
 
 export default function HomePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [showSignupModal, setShowSignupModal] = useState(false)
   const [landingContent, setLandingContent] = useState({
     hero: {
       title: "Your Health, One Click Away",
@@ -126,8 +130,24 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar onSidebarOpen={() => setIsSidebarOpen(true)} />
-      <WelcomeSidebar open={isSidebarOpen} onOpenChange={setIsSidebarOpen} />
+      <Navbar onSidebarOpen={() => setIsSidebarOpen(true)} onSignIn={() => setShowLoginModal(true)} />
+      <WelcomeSidebar open={isSidebarOpen} onOpenChange={setIsSidebarOpen} onSignIn={() => setShowLoginModal(true)} />
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onSwitchToSignup={() => {
+          setShowLoginModal(false)
+          setShowSignupModal(true)
+        }}
+      />
+      <SignupModal 
+        isOpen={showSignupModal}
+        onClose={() => setShowSignupModal(false)}
+        onSwitchToSignin={() => {
+          setShowSignupModal(false)
+          setShowLoginModal(true)
+        }}
+      />
 
       {/* Hero Section */}
       <section className="bg-pale-stone py-16 md:py-24">
@@ -135,26 +155,25 @@ export default function HomePage() {
           <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
             <div className="flex flex-col justify-center space-y-4">
               <div className="space-y-2">
-                <Logo href="/" className="mb-4" />
                 <h1 className="text-3xl font-bold tracking-tighter text-graphite sm:text-5xl xl:text-6xl">
                   {landingContent.hero.title}
                 </h1>
                 <p className="max-w-[600px] text-drift-gray md:text-xl">{landingContent.hero.description}</p>
               </div>
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                <Link
-                  href="/signup"
+                <button
+                  onClick={() => setShowSignupModal(true)}
                   className="inline-flex h-10 items-center justify-center rounded-md bg-soft-amber px-8 text-sm font-medium text-graphite transition-colors hover:bg-soft-amber/90 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
                 >
                   Get Started
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-                <Link
-                  href="/login"
+                </button>
+                <button
+                  onClick={() => setShowLoginModal(true)}
                   className="inline-flex h-10 items-center justify-center rounded-md border border-earth-beige bg-white px-8 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
                 >
                   Sign In
-                </Link>
+                </button>
               </div>
             </div>
             <div className="flex items-center justify-center">
@@ -281,13 +300,13 @@ export default function HomePage() {
             </h2>
             <p className="max-w-[85%] text-drift-gray md:text-xl">{landingContent.cta.description}</p>
             <div className="flex flex-col gap-2 min-[400px]:flex-row">
-              <Link
-                href="/signup"
+              <button
+                onClick={() => setShowSignupModal(true)}
                 className="inline-flex h-10 items-center justify-center rounded-md bg-soft-amber px-8 text-sm font-medium text-graphite transition-colors hover:bg-soft-amber/90 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
               >
                 Get Started
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+              </button>
               <Link
                 href="/information?section=about"
                 className="inline-flex h-10 items-center justify-center rounded-md border border-earth-beige bg-white px-8 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
@@ -328,13 +347,13 @@ export default function HomePage() {
                 ))}
               </ul>
               <div>
-                <Link
-                  href="/signup"
+                <button
+                  onClick={() => setShowSignupModal(true)}
                   className="inline-flex h-10 items-center justify-center rounded-md bg-soft-amber px-8 text-sm font-medium text-graphite transition-colors hover:bg-soft-amber/90 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
                 >
                   Join as a Provider
                   <Stethoscope className="ml-2 h-4 w-4" />
-                </Link>
+                </button>
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { X, LogOut } from "lucide-react"
+import { X, LogOut, AlertCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 export function LogoutConfirmation({ isOpen, onClose, onConfirm }) {
@@ -9,19 +9,28 @@ export function LogoutConfirmation({ isOpen, onClose, onConfirm }) {
   const [startX, setStartX] = useState(null)
   const [offsetX, setOffsetX] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
+  const [isClosing, setIsClosing] = useState(false)
   const modalRef = useRef(null)
 
   // Handle escape key press
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === "Escape" && isOpen) {
-        onClose()
+        handleClose()
       }
     }
 
     document.addEventListener("keydown", handleEscape)
     return () => document.removeEventListener("keydown", handleEscape)
-  }, [isOpen, onClose])
+  }, [isOpen])
+
+  const handleClose = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      setIsClosing(false)
+      onClose()
+    }, 300)
+  }
 
   // Prevent scrolling when modal is open
   useEffect(() => {
@@ -69,7 +78,7 @@ export function LogoutConfirmation({ isOpen, onClose, onConfirm }) {
 
   const handleTouchEnd = () => {
     if (Math.abs(offsetX) > 100) {
-      onClose()
+      handleClose()
     } else {
       setOffsetX(0)
     }
@@ -79,7 +88,7 @@ export function LogoutConfirmation({ isOpen, onClose, onConfirm }) {
 
   const handleMouseUp = () => {
     if (Math.abs(offsetX) > 100) {
-      onClose()
+      handleClose()
     } else {
       setOffsetX(0)
     }
@@ -87,27 +96,42 @@ export function LogoutConfirmation({ isOpen, onClose, onConfirm }) {
     setStartX(null)
   }
 
+  const handleConfirm = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      setIsClosing(false)
+      onConfirm()
+    }, 300)
+  }
+
   if (!isOpen) return null
 
   return (
     <>
-      {/* Backdrop with animation */}
+      <style jsx>{`
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.9) translateY(-20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes modalOut { from { opacity: 1; transform: scale(1) translateY(0); } to { opacity: 0; transform: scale(0.9) translateY(20px); } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        .animate-fade-out { animation: fadeOut 0.3s ease-out; }
+        .animate-modal-in { animation: modalIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .animate-modal-out { animation: modalOut 0.3s ease-in; }
+      `}</style>
+
+      {/* Backdrop with blur and animation */}
       <div
-        className="fixed inset-0 z-50 bg-black/50 transition-opacity duration-300"
-        onClick={onClose}
+        className={`fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
+        onClick={handleClose}
         style={{
           opacity: Math.max(0.5, 0.5 - Math.abs(offsetX) / 500),
         }}
       />
 
-      {/* Modal with animation */}
+      {/* Modal with enhanced animation */}
       <div
         ref={modalRef}
-        className="fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-lg transition-transform"
-        style={{
-          transform: `translate(-50%, -50%) translateX(${offsetX}px)`,
-          opacity: Math.max(0, 1 - Math.abs(offsetX) / 200),
-        }}
+        className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 ${isClosing ? 'animate-fade-out' : 'animate-fade-in'}`}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -116,42 +140,63 @@ export function LogoutConfirmation({ isOpen, onClose, onConfirm }) {
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-graphite">Confirm Logout</h2>
-          <button
-            onClick={onClose}
-            className="rounded-full p-1 text-drift-gray hover:bg-pale-stone hover:text-soft-amber transition-colors duration-200"
-          >
-            <X className="h-5 w-5" />
-            <span className="sr-only">Close</span>
-          </button>
-        </div>
-
-        <div className="mt-4 flex items-center justify-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-            <LogOut className="h-6 w-6 text-red-600" />
+        <div
+          className={`w-full max-w-md mx-auto rounded-2xl bg-white shadow-2xl overflow-hidden ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+          style={{
+            transform: `translateX(${offsetX}px)`,
+            opacity: Math.max(0, 1 - Math.abs(offsetX) / 200),
+          }}
+        >
+          {/* Header with gradient background */}
+          <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 sm:p-8 relative overflow-hidden">
+            <div className="relative z-10">
+              <div className="flex items-center justify-center mb-4">
+                <div className="flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-orange-500/10 border-4 border-orange-500/20">
+                  <AlertCircle className="h-8 w-8 sm:h-10 sm:w-10 text-orange-500" />
+                </div>
+              </div>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-graphite text-center mb-2">
+                Confirm Logout
+              </h2>
+              <p className="text-xs sm:text-sm md:text-base text-drift-gray text-center">
+                Are you sure you want to logout?
+              </p>
+            </div>
+            {/* Decorative elements */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16"></div>
+            <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12"></div>
           </div>
-        </div>
 
-        <p className="mt-4 text-center text-drift-gray">Are you sure you want to log out of your account?</p>
-
-        <div className="mt-2 text-xs text-center text-drift-gray italic">
-          <p>Swipe left or right to dismiss</p>
-        </div>
-
-        <div className="mt-6 flex justify-end space-x-2">
-          <button
-            onClick={onClose}
-            className="rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
-          >
-            Logout
-          </button>
+          {/* Content */}
+          <div className="p-4 sm:p-6 md:p-8">
+            <div className="space-y-4">
+              <p className="text-center text-xs sm:text-sm md:text-base text-drift-gray">
+                You will be logged out and redirected to the home page. You can log back in anytime.
+              </p>
+              
+              <div className="pt-2 sm:pt-4">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                  <button
+                    onClick={handleClose}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-earth-beige bg-white px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-semibold text-graphite hover:bg-pale-stone transition-all duration-200 hover:shadow-md"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleConfirm}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-lg hover:bg-orange-600 transition-all duration-200 hover:shadow-xl"
+                  >
+                    <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    Yes, Logout
+                  </button>
+                </div>
+              </div>
+              
+              <p className="text-center text-xs text-drift-gray mt-2 sm:mt-4 italic">
+                Swipe left or right to dismiss
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </>

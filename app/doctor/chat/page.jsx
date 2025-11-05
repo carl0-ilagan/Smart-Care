@@ -8,7 +8,6 @@ import {
   Filter,
   Info,
   MessageSquare,
-  Phone,
   Search,
   Video,
   X,
@@ -47,8 +46,7 @@ import ConversationOptionsMenu from "@/components/conversation-options-menu"
 import MessageDisplay from "@/components/message-display"
 import DeleteConversationModal from "@/components/delete-conversation-modal"
 import MessageInput from "@/components/message-input"
-import { createCall } from "@/lib/call-utils"
-import CallNotification from "@/components/call-notification"
+// Call features removed per requirements
 import ProfileImage from "@/components/profile-image"
 
 export default function DoctorChatPage() {
@@ -925,20 +923,6 @@ export default function DoctorChatPage() {
             </div>
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleVoiceCall}
-                className="rounded-full bg-pale-stone p-2 text-drift-gray hover:bg-soft-amber hover:text-white"
-                title="Voice Call"
-              >
-                <Phone className="h-5 w-5" />
-              </button>
-              <button
-                onClick={handleVideoCall}
-                className="rounded-full bg-pale-stone p-2 text-drift-gray hover:bg-soft-amber hover:text-white"
-                title="Video Call"
-              >
-                <Video className="h-5 w-5" />
-              </button>
-              <button
                 onClick={() => setShowPatientInfo(true)}
                 className="rounded-full bg-pale-stone p-2 text-drift-gray hover:bg-soft-amber hover:text-white"
                 title="Patient Information"
@@ -955,7 +939,7 @@ export default function DoctorChatPage() {
             </div>
           </div>
 
-          {/* Messages */}
+          {/* Messages (only this area scrolls) */}
           <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 h-full">
             {messagesLoading ? (
               <div className="flex h-full items-center justify-center">
@@ -1061,30 +1045,32 @@ export default function DoctorChatPage() {
             )}
           </div>
 
-          {/* Message Input */}
-          <MessageInput
-            value={newMessage}
-            onChange={setNewMessage}
-            onSend={handleSendMessage}
-            onFileSelect={(fileData) => {
-              setSelectedFile(fileData.file)
-              if (fileData.fileData) {
-                // If fileData is provided (from voice recorder or camera)
-                setSelectedFile({
-                  ...fileData.file,
-                  fileData: fileData.fileData,
-                })
-              }
-            }}
-            selectedFile={selectedFile}
-            onRemoveFile={handleRemoveFile}
-            fileError={fileError}
-            sendingMessage={sendingMessage}
-            replyingTo={replyingTo}
-            onCancelReply={handleCancelReply}
-            onTyping={handleTyping}
-            otherUserName={patientDetails?.displayName}
-          />
+          {/* Message Input (fixed at bottom; only messages scroll) */}
+          <div className="shrink-0 sticky bottom-0 bg-white border-t border-pale-stone p-2">
+            <MessageInput
+              value={newMessage}
+              onChange={setNewMessage}
+              onSend={handleSendMessage}
+              onFileSelect={(fileData) => {
+                setSelectedFile(fileData.file)
+                if (fileData.fileData) {
+                  // If fileData is provided (from voice recorder or camera)
+                  setSelectedFile({
+                    ...fileData.file,
+                    fileData: fileData.fileData,
+                  })
+                }
+              }}
+              selectedFile={selectedFile}
+              onRemoveFile={handleRemoveFile}
+              fileError={fileError}
+              sendingMessage={sendingMessage}
+              replyingTo={replyingTo}
+              onCancelReply={handleCancelReply}
+              onTyping={handleTyping}
+              otherUserName={patientDetails?.displayName}
+            />
+          </div>
         </>
       ) : (
         <div className="flex h-full items-center justify-center p-4">
@@ -1219,8 +1205,7 @@ export default function DoctorChatPage() {
         onClose={() => setShowNewConversationModal(false)}
         onConversationCreated={handleConversationCreated}
       />
-      {/* Call Notification */}
-      <CallNotification />
+      {/* Call Notification removed */}
     </div>
   )
 }

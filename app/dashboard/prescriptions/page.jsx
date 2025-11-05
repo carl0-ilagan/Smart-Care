@@ -13,6 +13,9 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  LayoutGrid,
+  LayoutList,
+  SlidersHorizontal,
 } from "lucide-react"
 import { getPatientPrescriptions, generatePrintablePrescription } from "@/lib/prescription-utils"
 import { generatePrescriptionPDF } from "@/lib/pdf-utils"
@@ -20,6 +23,7 @@ import { SuccessNotification } from "@/components/success-notification"
 import { useAuth } from "@/contexts/auth-context"
 import ProfileImage from "@/components/profile-image"
 import { DashboardHeaderBanner } from "@/components/dashboard-header-banner"
+import { PrescriptionPreviewTemplate } from "@/components/prescription-preview-templates"
 
 export default function PatientPrescriptionsPage() {
   const { user } = useAuth()
@@ -28,14 +32,17 @@ export default function PatientPrescriptionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
+  const [isClosingFilters, setIsClosingFilters] = useState(false)
   const [selectedPrescription, setSelectedPrescription] = useState(null)
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false)
   const [notification, setNotification] = useState({ message: "", isVisible: false })
   const [patientInfo, setPatientInfo] = useState(null)
+  const [viewMode, setViewMode] = useState("grid") // "grid" or "list"
+  const [filterDoctor, setFilterDoctor] = useState("all")
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [itemsPerPage] = useState(9) // Fixed to 9 items per page
   const [totalPages, setTotalPages] = useState(1)
 
   // Add this function inside the component but outside any other functions:
@@ -78,6 +85,7 @@ export default function PatientPrescriptionsPage() {
             age: userData.age || calculatedAge || "N/A",
             gender: userData.gender || "Not specified",
             dateOfBirth: userData.dateOfBirth,
+            address: userData.address || userData.streetAddress || "",
           })
         }
 
@@ -169,7 +177,6 @@ export default function PatientPrescriptionsPage() {
 
   // Filter prescriptions
   const filteredPrescriptions = prescriptions.filter((prescription) => {
-    // Filter by search term
     const matchesSearch =
       prescription.doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prescription.medications.some(
@@ -178,10 +185,10 @@ export default function PatientPrescriptionsPage() {
           med.instructions?.toLowerCase().includes(searchTerm.toLowerCase()),
       )
 
-    // Filter by status
     const matchesStatus = filterStatus === "all" || prescription.status === filterStatus
+    const matchesDoctor = filterDoctor === "all" || prescription.doctorId === filterDoctor
 
-    return matchesSearch && matchesStatus
+    return matchesSearch && matchesStatus && matchesDoctor
   })
 
   // Update total pages when filtered prescriptions change
@@ -190,6 +197,15 @@ export default function PatientPrescriptionsPage() {
     // Reset to first page when filters change
     setCurrentPage(1)
   }, [filteredPrescriptions.length, itemsPerPage])
+
+  // Handle filter close with animation
+  const handleCloseFilters = () => {
+    setIsClosingFilters(true)
+    setTimeout(() => {
+      setShowFilters(false)
+      setIsClosingFilters(false)
+    }, 300)
+  }
 
   // Get paginated prescriptions
   const paginatedPrescriptions = filteredPrescriptions.slice(
@@ -302,26 +318,262 @@ export default function PatientPrescriptionsPage() {
     }
   }
 
-  // Handle PDF download
-  const handleDownloadPDF = (prescription) => {
+  // Handle PDF download - capture preview content directly without opening modal
+  const handleDownloadPDF = async (prescription) => {
     try {
-      // Generate PDF
-      const doc = generatePrescriptionPDF(
-        prescription,
-        {
-          name: prescription.doctorName,
-          specialty: "General Practitioner", // In a real app, this would come from the prescription data
-          licenseNumber: "1234567",
-          clinicAddress: "123 Health St., Quezon City, Philippines",
-          contactNumber: "(02) 1234-5678",
-          ptrNumber: "2025-0001234",
-          s2Number: "S2-123456",
+      // Check if already downloaded
+      if (prescription.downloadedByPatient === true) {
+        setNotification({
+          message: "This prescription has already been downloaded. You can only download it once.",
+          isVisible: true,
+        })
+        return
+      }
+
+      // Show loading notification
+      setNotification({
+        message: "Generating PDF...",
+        isVisible: true,
+      })
+
+      // Fetch doctor info if needed
+      let prescriptionData = prescription
+      if (!prescription.doctorInfo && prescription.doctorId) {
+        const doctorInfo = await fetchDoctorInfo(prescription.doctorId)
+        if (doctorInfo) {
+          prescriptionData = {
+            ...prescription,
+            doctorInfo,
+          }
+        }
+      }
+
+      // Create hidden container for PDF generation (positioned off-screen but visible to html2canvas)
+      const hiddenContainer = document.createElement('div')
+      hiddenContainer.id = 'pdf-generation-container'
+      hiddenContainer.style.position = 'absolute'
+      hiddenContainer.style.left = '-9999px'
+      hiddenContainer.style.top = '0px'
+      hiddenContainer.style.width = '400px'
+      hiddenContainer.style.height = 'auto'
+      hiddenContainer.style.backgroundColor = '#ffffff'
+      hiddenContainer.style.zIndex = '-9999'
+      document.body.appendChild(hiddenContainer)
+
+      // Import React and components dynamically
+      const React = await import('react')
+      const { createRoot } = await import('react-dom/client')
+      const { PrescriptionPreviewTemplate } = await import('@/components/prescription-preview-templates')
+
+      const formatDate = (date) => {
+        const prescriptionDate = prescriptionData.startDate || prescriptionData.createdAt || date
+        const dateObj = prescriptionDate?.seconds 
+          ? new Date(prescriptionDate.seconds * 1000)
+          : prescriptionDate?.toDate
+          ? prescriptionDate.toDate()
+          : new Date(prescriptionDate || date)
+        const month = String(dateObj.getMonth() + 1).padStart(2, "0")
+        const day = String(dateObj.getDate()).padStart(2, "0")
+        const year = dateObj.getFullYear()
+        return `${month}/${day}/${year}`
+      }
+
+      // Render preview component in hidden container
+      const root = createRoot(hiddenContainer)
+      // Store root reference for cleanup
+      hiddenContainer._reactRoot = root
+      root.render(
+        React.createElement('div', {
+          className: 'p-6 bg-white relative max-w-lg mx-auto',
+          'data-prescription-preview': true
         },
-        patientInfo,
+        React.createElement(PrescriptionPreviewTemplate, {
+          template: prescriptionData.template || "classic",
+          formData: {
+            patientName: prescriptionData.patientName || patientInfo?.name || user?.displayName || "",
+            patientAddress: prescriptionData.patientAddress || patientInfo?.address || "",
+            patientAge: prescriptionData.patientAge || String(patientInfo?.age || calculateAge(patientInfo?.dateOfBirth) || ""),
+            patientGender: prescriptionData.patientGender || patientInfo?.gender || "",
+            medications: prescriptionData.medications || [],
+            notes: prescriptionData.notes || "",
+            signature: prescriptionData.signature || null,
+          },
+          doctorInfo: {
+            name: prescriptionData.doctorInfo?.name || prescriptionData.doctorName || "",
+            specialty: prescriptionData.doctorInfo?.specialty || prescriptionData.doctorSpecialty || "",
+            licenseNumber: prescriptionData.doctorInfo?.licenseNumber || prescriptionData.doctorLicenseNumber || "",
+            clinicAddress: prescriptionData.doctorInfo?.clinicAddress || prescriptionData.doctorInfo?.officeAddress || "",
+            contactNumber: prescriptionData.doctorInfo?.contactNumber || prescriptionData.doctorInfo?.phone || "",
+            email: prescriptionData.doctorInfo?.email || "",
+            province: prescriptionData.doctorInfo?.province || "",
+            healthOffice: prescriptionData.doctorInfo?.healthOffice || "",
+          },
+          formatDate,
+          isMobile: false,
+        }))
       )
 
-      // Save the PDF
-      doc.save(`prescription_${patientInfo.name.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`)
+      // Wait for React to render - use longer timeout for React hydration
+      await new Promise(resolve => setTimeout(resolve, 1500))
+
+      // Find the preview element
+      let previewElement = hiddenContainer.querySelector('[data-prescription-preview]')
+      
+      // If still not found, try finding any div inside
+      if (!previewElement) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        previewElement = hiddenContainer.querySelector('[data-prescription-preview]') || hiddenContainer.querySelector('div')
+      }
+      
+      if (!previewElement || !previewElement.innerHTML.trim()) {
+        root.unmount()
+        document.body.removeChild(hiddenContainer)
+        setNotification({
+          message: "Preview content not found. Please try again.",
+          isVisible: true,
+        })
+        return
+      }
+
+      // Wait for all images to fully load
+      const images = previewElement.querySelectorAll('img')
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve()
+          return new Promise((resolve, reject) => {
+            img.onload = resolve
+            img.onerror = reject
+            // Timeout after 5 seconds
+            setTimeout(() => reject(new Error('Image load timeout')), 5000)
+          })
+        })
+      )
+
+      // Remove blur from signature images before capturing
+      const signatureImages = previewElement.querySelectorAll('[data-signature-blur="true"]')
+      const originalFilters = []
+      signatureImages.forEach((img) => {
+        originalFilters.push(img.style.filter)
+        img.style.filter = 'none' // Remove blur for PDF
+      })
+
+      // Wait a bit for CSS changes to take effect
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Import html2canvas and jsPDF dynamically
+      const html2canvas = (await import('html2canvas')).default
+      const { jsPDF } = await import('jspdf')
+
+      // Move container to a position where html2canvas can capture it but user can't see it
+      // Use very negative position but ensure it's rendered
+      hiddenContainer.style.position = 'fixed'
+      hiddenContainer.style.left = '-2000px'
+      hiddenContainer.style.top = '0px'
+      hiddenContainer.style.width = '400px'
+      hiddenContainer.style.visibility = 'visible' // Must be visible for html2canvas
+      hiddenContainer.style.opacity = '1'
+      
+      // Force a reflow to ensure rendering
+      void hiddenContainer.offsetHeight
+      
+      // Wait a bit more for layout to stabilize
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      // Capture the preview element as canvas
+      const canvas = await html2canvas(previewElement, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+        windowWidth: 400,
+        windowHeight: previewElement.scrollHeight || 800,
+        onclone: (clonedDoc, element) => {
+          // Remove blur from cloned document
+          const clonedImages = clonedDoc.querySelectorAll('[data-signature-blur="true"]')
+          clonedImages.forEach((img) => {
+            img.style.filter = 'none'
+          })
+        },
+      })
+
+      // Clean up hidden container
+      root.unmount()
+      document.body.removeChild(hiddenContainer)
+
+      // Validate canvas data
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Failed to capture preview content')
+      }
+
+      // Calculate PDF dimensions
+      const imgWidth = canvas.width
+      const imgHeight = canvas.height
+      const imgData = canvas.toDataURL('image/png', 1.0)
+
+      // Validate image data
+      if (!imgData || imgData === 'data:,') {
+        throw new Error('Failed to generate image data')
+      }
+
+      // Create PDF - use A5 size (148mm x 210mm) or adjust based on content
+      const pdfWidth = 148 // A5 width in mm
+      const pdfHeight = (imgHeight * pdfWidth) / imgWidth // Maintain aspect ratio
+      
+      const pdf = new jsPDF({
+        orientation: pdfHeight > pdfWidth ? 'portrait' : 'landscape',
+        unit: 'mm',
+        format: [pdfWidth, pdfHeight],
+      })
+
+      // Add image to PDF
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST')
+
+      // Generate filename
+      const patientName = prescription.patientName || patientInfo?.name || "patient"
+      const date = prescription.startDate || prescription.createdAt || new Date()
+      const dateStr = date?.seconds 
+        ? new Date(date.seconds * 1000).toISOString().split("T")[0]
+        : new Date(date).toISOString().split("T")[0]
+
+      // Save PDF
+      pdf.save(`prescription_${patientName.replace(/\s+/g, "_")}_${dateStr}.pdf`)
+
+      // Update local state IMMEDIATELY (before database call) to disable button
+      const downloadTimestamp = new Date().toISOString()
+      setPrescriptions(prevPrescriptions => 
+        prevPrescriptions.map(p => 
+          p.id === prescription.id 
+            ? { ...p, downloadedByPatient: true, downloadedAt: downloadTimestamp }
+            : p
+        )
+      )
+      
+      // Update selected prescription if it's the same
+      if (selectedPrescription?.id === prescription.id) {
+        setSelectedPrescription(prev => ({
+          ...prev,
+          downloadedByPatient: true,
+          downloadedAt: downloadTimestamp,
+        }))
+      }
+
+      // Mark prescription as downloaded in database (non-blocking)
+      // Use fire-and-forget approach so button disables immediately
+      Promise.resolve().then(async () => {
+        try {
+          const { updateDoc, doc } = await import('firebase/firestore')
+          const { db } = await import('@/lib/firebase')
+          const prescriptionRef = doc(db, 'prescriptions', prescription.id)
+          await updateDoc(prescriptionRef, {
+            downloadedByPatient: true,
+            downloadedAt: downloadTimestamp,
+          })
+        } catch (error) {
+          console.error("Error marking prescription as downloaded:", error)
+          // Silently fail - state is already updated
+        }
+      })
 
       setNotification({
         message: "PDF downloaded successfully",
@@ -329,8 +581,29 @@ export default function PatientPrescriptionsPage() {
       })
     } catch (error) {
       console.error("Error generating PDF:", error)
+      
+      // Clean up any remaining hidden containers
+      const hiddenContainer = document.getElementById('pdf-generation-container')
+      if (hiddenContainer) {
+        try {
+          const root = hiddenContainer._reactRoot
+          if (root) {
+            root.unmount()
+          }
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        try {
+          if (hiddenContainer.parentNode) {
+            document.body.removeChild(hiddenContainer)
+          }
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+      }
+      
       setNotification({
-        message: "Error generating PDF",
+        message: "Error generating PDF. Please try again.",
         isVisible: true,
       })
     }
@@ -409,28 +682,56 @@ export default function PatientPrescriptionsPage() {
             className="w-full rounded-md border border-earth-beige bg-white py-2 pl-10 pr-3 text-graphite placeholder:text-drift-gray/60 focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
           />
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite shadow-sm transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
-        >
-          <Filter className="mr-2 h-4 w-4" />
-          Filters
-          {filterStatus !== "all" && (
-            <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-soft-amber text-xs text-white">
-              1
-            </span>
-          )}
-        </button>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-graphite shadow-sm transition-all hover:bg-amber-50 hover:border-amber-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
+          >
+            {viewMode === "list" ? (
+              <>
+                <LayoutGrid className="h-4 w-4" />
+                Grid View
+              </>
+            ) : (
+              <>
+                <LayoutList className="h-4 w-4" />
+                List View
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              if (showFilters) {
+                setIsClosingFilters(true)
+                setTimeout(() => {
+                  setShowFilters(false)
+                  setIsClosingFilters(false)
+                }, 300)
+              } else {
+                setShowFilters(true)
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-graphite shadow-sm transition-all hover:bg-amber-50 hover:border-amber-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2 relative"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            {(filterStatus !== "all" || filterDoctor !== "all") && (
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-soft-amber to-amber-500 text-xs font-bold text-white shadow-md">1</span>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters with smooth animation */}
       {showFilters && (
-        <div className="rounded-lg border border-earth-beige bg-white p-4 shadow-sm animate-slideDown">
+        <div
+          className={`rounded-lg border border-amber-200 bg-white p-4 shadow-sm transition-all duration-300 ${
+            isClosingFilters ? "opacity-0 max-h-0 overflow-hidden -translate-y-2" : "opacity-100 max-h-96 translate-y-0"
+          }`}
+        >
           <div className="flex flex-col space-y-4 sm:flex-row sm:items-end sm:space-x-4 sm:space-y-0">
             <div className="flex-1 space-y-2">
-              <label htmlFor="filterStatus" className="text-sm font-medium text-graphite">
-                Status
-              </label>
+              <label htmlFor="filterStatus" className="text-sm font-medium text-graphite">Status</label>
               <select
                 id="filterStatus"
                 value={filterStatus}
@@ -444,22 +745,25 @@ export default function PatientPrescriptionsPage() {
               </select>
             </div>
             <div className="flex-1 space-y-2">
-              <label htmlFor="itemsPerPage" className="text-sm font-medium text-graphite">
-                Items Per Page
-              </label>
+              <label htmlFor="filterDoctor" className="text-sm font-medium text-graphite">Doctor</label>
               <select
-                id="itemsPerPage"
-                value={itemsPerPage}
-                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                id="filterDoctor"
+                value={filterDoctor}
+                onChange={(e) => setFilterDoctor(e.target.value)}
                 className="w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
               >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={15}>15</option>
+                <option value="all">All</option>
+                {Array.from(new Map(prescriptions.map((p) => [p.doctorId, p.doctorName])).entries()).map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
               </select>
             </div>
             <button
-              onClick={() => setFilterStatus("all")}
+              onClick={() => {
+                setFilterStatus("all")
+                setFilterDoctor("all")
+                setSearchTerm("")
+              }}
               className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
             >
               Clear Filters
@@ -468,134 +772,292 @@ export default function PatientPrescriptionsPage() {
         </div>
       )}
 
-      {/* Prescriptions List */}
-      <div className="space-y-6">
+      {/* Prescriptions Grid/List View with smooth toggle */}
+      <div key={viewMode} className="space-y-6 animate-fadeIn">
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-soft-amber border-t-transparent"></div>
             <span className="ml-3 text-drift-gray">Loading prescriptions...</span>
           </div>
         ) : filteredPrescriptions.length > 0 ? (
+          <>
+            {viewMode === "grid" && filterStatus === "all" && !searchTerm ? (
+              <>
+                {filteredPrescriptions.some((p) => p.status === "active") && (
           <div className="space-y-4">
-            {paginatedPrescriptions.map((prescription) => {
+                    <h2 className="text-lg font-semibold text-graphite">Active Prescriptions</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {paginatedPrescriptions.filter((p)=>p.status==="active").map((prescription) => {
               const statusInfo = getStatusInfo(prescription.status)
               const date = new Date(prescription.createdAt)
-              const formattedDate = date.toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              })
-
+                        const formattedDate = date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+                        // existing grid card markup here (same as below)
               return (
                 <div
                   key={prescription.id}
-                  className="overflow-hidden rounded-lg border-l-4 border-l-soft-amber border-earth-beige bg-white shadow-sm transition-all hover:shadow-md"
-                >
-                  <div className="flex flex-wrap items-center justify-between p-3">
-                    <div className="flex items-center space-x-3 mb-2 sm:mb-0">
+                            className="overflow-hidden rounded-xl border-2 border-amber-200/50 bg-gradient-to-br from-white via-amber-50/20 to-yellow-50/30 shadow-lg transition-all hover:shadow-xl hover:scale-[1.02]"
+                          >
+                            <div className="p-4">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-soft-amber/20 to-amber-50">
                       <Pill className="h-5 w-5 text-soft-amber" />
-                      <div>
-                        <div className="flex items-center flex-wrap">
-                          <h3 className="font-medium text-graphite mr-2">
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold text-gray-900 text-sm truncate">
                             {prescription.medications[0].name}
                             {prescription.medications.length > 1 && (
-                              <span className="ml-1 text-xs text-drift-gray">
+                                        <span className="ml-1 text-xs text-gray-500">
                                 +{prescription.medications.length - 1}
                               </span>
                             )}
                           </h3>
                           <span
-                            className={`rounded-full ${statusInfo.color} px-2 py-0.5 text-xs font-medium ${statusInfo.textColor}`}
+                                      className={`inline-flex rounded-full ${statusInfo.color} px-2 py-0.5 text-[10px] font-medium ${statusInfo.textColor} mt-1`}
                           >
                             {statusInfo.label}
                           </span>
                         </div>
-                        <p className="text-xs text-drift-gray">
-                          {prescription.medications[0].dosage}, {prescription.medications[0].frequency}
-                        </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center">
-                        <ProfileImage userId={prescription.doctorId} role="doctor" size="xs" className="mr-1.5" />
-                        <span className="text-xs text-drift-gray">{prescription.doctorName}</span>
+                              <div className="space-y-2 mb-4">
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-medium">Dosage:</span> {prescription.medications[0].dosage}
+                                </p>
+                                <p className="text-xs text-gray-600">
+                                  <span className="font-medium">Frequency:</span> {prescription.medications[0].frequency}
+                                </p>
+                                {prescription.medications[0].duration && (
+                                  <p className="text-xs text-gray-600">
+                                    <span className="font-medium">Duration:</span> {prescription.medications[0].duration}
+                                  </p>
+                                )}
+                                {prescription.notes && (
+                                  <p className="text-[10px] text-gray-500 line-clamp-2">
+                                    <span className="font-medium text-gray-600">Notes:</span> {prescription.notes}
+                                  </p>
+                                )}
                       </div>
-                      <div className="flex items-center">
-                        <Calendar className="mr-1.5 h-3.5 w-3.5 text-drift-gray" />
-                        <span className="text-xs text-drift-gray">{formattedDate}</span>
+
+                              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-amber-200/50">
+                                <ProfileImage userId={prescription.doctorId} role="doctor" size="xs" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-900 truncate">{prescription.doctorName}</p>
+                                  <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                    <Calendar className="h-3 w-3" />
+                                    <span>{formattedDate}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-end space-x-2 border-t border-earth-beige bg-pale-stone/30 px-3 py-1.5">
+                              <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleViewPrescription(prescription)}
-                      className="rounded-md border border-earth-beige bg-white px-2.5 py-1 text-xs font-medium text-graphite transition-colors hover:bg-pale-stone"
+                                  className="flex-1 rounded-lg border-2 border-amber-200/50 bg-white px-3 py-2 text-xs font-semibold text-gray-900 transition-all hover:bg-amber-50 hover:border-amber-300"
                     >
                       Preview
                     </button>
                     <button
                       onClick={() => handleDownloadPDF(prescription)}
-                      className="inline-flex items-center rounded-md bg-soft-amber px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600"
+                       disabled={prescription.downloadedByPatient === true}
+                                  className={`flex-1 inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                         prescription.downloadedByPatient === true
+                                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                      : "bg-gradient-to-r from-soft-amber to-amber-500 text-white hover:from-amber-500 hover:to-amber-600"
+                       }`}
                     >
                       <Download className="mr-1 h-3.5 w-3.5" />
-                      PDF
+                       {prescription.downloadedByPatient === true ? "Downloaded" : "PDF"}
                     </button>
+                              </div>
                   </div>
                 </div>
               )
             })}
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center space-x-1 mt-6">
-                <button
-                  onClick={goToPreviousPage}
-                  disabled={currentPage === 1}
-                  className={`flex items-center justify-center rounded-md border p-2 ${
-                    currentPage === 1
-                      ? "border-gray-200 text-gray-400 cursor-not-allowed"
-                      : "border-earth-beige text-graphite hover:bg-pale-stone"
-                  }`}
-                  aria-label="Previous page"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-
-                {getPageNumbers().map((page, index) =>
-                  page === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-3 py-2 text-gray-500">
-                      ...
-                    </span>
-                  ) : (
-                    <button
-                      key={`page-${page}`}
-                      onClick={() => goToPage(page)}
-                      className={`min-w-[2rem] rounded-md px-3 py-2 text-sm font-medium ${
-                        currentPage === page ? "bg-soft-amber text-white" : "text-graphite hover:bg-pale-stone"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ),
+                    </div>
+                  </div>
                 )}
-
-                <button
-                  onClick={goToNextPage}
-                  disabled={currentPage === totalPages}
-                  className={`flex items-center justify-center rounded-md border p-2 ${
-                    currentPage === totalPages
-                      ? "border-gray-200 text-gray-400 cursor-not-allowed"
-                      : "border-earth-beige text-graphite hover:bg-pale-stone"
-                  }`}
-                  aria-label="Next page"
-                >
-                  <ChevronRight className="h-4 w-4" />
+                {filteredPrescriptions.some((p) => p.status === "expired") && (
+                  <div className="space-y-4">
+                    <h2 className="text-lg font-semibold text-graphite">Expired Prescriptions</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {paginatedPrescriptions.filter((p)=>p.status==="expired").map((prescription) => {
+                        const statusInfo = getStatusInfo(prescription.status)
+                        const date = new Date(prescription.createdAt)
+                        const formattedDate = date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+                        return (
+                          <div key={prescription.id} className="overflow-hidden rounded-xl border-2 border-amber-200/50 bg-gradient-to-br from-white via-amber-50/20 to-yellow-50/30 shadow-lg transition-all hover:shadow-xl hover:scale-[1.02]">
+                            <div className="p-4">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-soft-amber/20 to-amber-50">
+                                    <Pill className="h-5 w-5 text-soft-amber" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold text-gray-900 text-sm truncate">{prescription.medications[0].name}</h3>
+                                    <span className={`inline-flex rounded-full ${statusInfo.color} px-2 py-0.5 text-[10px] font-medium ${statusInfo.textColor} mt-1`}>{statusInfo.label}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* meta/notes/actions same as above */}
+                              <div className="space-y-2 mb-4">
+                                <p className="text-xs text-gray-600"><span className="font-medium">Dosage:</span> {prescription.medications[0].dosage}</p>
+                                <p className="text-xs text-gray-600"><span className="font-medium">Frequency:</span> {prescription.medications[0].frequency}</p>
+                                {prescription.notes && (<p className="text-[10px] text-gray-500 line-clamp-2"><span className="font-medium text-gray-600">Notes:</span> {prescription.notes}</p>)}
+                              </div>
+                              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-amber-200/50">
+                                <ProfileImage userId={prescription.doctorId} role="doctor" size="xs" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-900 truncate">{prescription.doctorName}</p>
+                                  <div className="flex items-center gap-1 text-[10px] text-gray-500"><Calendar className="h-3 w-3" /><span>{formattedDate}</span></div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button onClick={() => handleViewPrescription(prescription)} className="flex-1 rounded-lg border-2 border-amber-200/50 bg-white px-3 py-2 text-xs font-semibold text-gray-900 transition-all hover:bg-amber-50 hover:border-amber-300">Preview</button>
+                                <button onClick={() => handleDownloadPDF(prescription)} disabled={prescription.downloadedByPatient === true} className={`flex-1 inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${prescription.downloadedByPatient === true ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-gradient-to-r from-soft-amber to-amber-500 text-white hover:from-amber-500 hover:to-amber-600"}`}>
+                                  <Download className="mr-1 h-3.5 w-3.5" />
+                                  {prescription.downloadedByPatient === true ? "Downloaded" : "PDF"}
                 </button>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
               </div>
             )}
+              </>
+            ) : (
+              <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-4"}>
+                {paginatedPrescriptions.map((prescription) => {
+                  const statusInfo = getStatusInfo(prescription.status)
+                  const date = new Date(prescription.createdAt)
+                  const formattedDate = date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
+
+                  if (viewMode === "grid") {
+                    return (
+                      <div
+                        key={prescription.id}
+                        className="overflow-hidden rounded-xl border-2 border-amber-200/50 bg-gradient-to-br from-white via-amber-50/20 to-yellow-50/30 shadow-lg transition-all hover:shadow-xl hover:scale-[1.02]"
+                      >
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-soft-amber/20 to-amber-50">
+                                <Pill className="h-5 w-5 text-soft-amber" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-gray-900 text-sm truncate">
+                                  {prescription.medications[0].name}
+                                  {prescription.medications.length > 1 && (
+                                    <span className="ml-1 text-xs text-gray-500">
+                                      +{prescription.medications.length - 1}
+                                    </span>
+                                  )}
+                                </h3>
+                                <span className={`inline-flex rounded-full ${statusInfo.color} px-2 py-0.5 text-[10px] font-medium ${statusInfo.textColor} mt-1`}>{statusInfo.label}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2 mb-4">
+                            <p className="text-xs text-gray-600"><span className="font-medium">Dosage:</span> {prescription.medications[0].dosage}</p>
+                            <p className="text-xs text-gray-600"><span className="font-medium">Frequency:</span> {prescription.medications[0].frequency}</p>
+                            {prescription.medications[0].duration && (
+                              <p className="text-xs text-gray-600"><span className="font-medium">Duration:</span> {prescription.medications[0].duration}</p>
+                            )}
+                            {prescription.notes && (
+                              <p className="text-[10px] text-gray-500 line-clamp-2"><span className="font-medium text-gray-600">Notes:</span> {prescription.notes}</p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 mb-4 pb-4 border-b border-amber-200/50">
+                            <ProfileImage userId={prescription.doctorId} role="doctor" size="xs" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-900 truncate">{prescription.doctorName}</p>
+                              <div className="flex items-center gap-1 text-[10px] text-gray-500"><Calendar className="h-3 w-3" /><span>{formattedDate}</span></div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleViewPrescription(prescription)} className="flex-1 rounded-lg border-2 border-amber-200/50 bg-white px-3 py-2 text-xs font-semibold text-gray-900 transition-all hover:bg-amber-50 hover:border-amber-300">Preview</button>
+                            <button onClick={() => handleDownloadPDF(prescription)} disabled={prescription.downloadedByPatient === true} className={`flex-1 inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${prescription.downloadedByPatient === true ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-gradient-to-r from-soft-amber to-amber-500 text-white hover:from-amber-500 hover:to-amber-600"}`}>
+                              <Download className="mr-1 h-3.5 w-3.5" />
+                              {prescription.downloadedByPatient === true ? "Downloaded" : "PDF"}
+                </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  // List view item
+                  return (
+                    <div
+                      key={prescription.id}
+                      className="group relative overflow-hidden rounded-xl border border-earth-beige bg-white shadow-sm transition-all hover:shadow-md hover:border-amber-200/80"
+                    >
+                      <div className="p-3 sm:p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-soft-amber/20 to-amber-50 flex-shrink-0">
+                            <Pill className="h-5 w-5 text-soft-amber" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-semibold text-graphite truncate">{prescription.medications[0].name}</h3>
+                              <span className={`inline-flex rounded-full ${statusInfo.color} px-2 py-0.5 text-[10px] font-medium ${statusInfo.textColor}`}>{statusInfo.label}</span>
+                            </div>
+                            <div className="mt-0.5 text-xs text-drift-gray truncate">
+                              {prescription.medications[0].dosage}, {prescription.medications[0].frequency}
+                              {prescription.medications[0].duration && ` • ${prescription.medications[0].duration}`}
+                            </div>
+                          </div>
+                          <div className="hidden sm:flex items-center gap-3 text-xs text-drift-gray">
+                            <div className="flex items-center">
+                              <ProfileImage userId={prescription.doctorId} role="doctor" size="xs" className="mr-1.5" />
+                              <span className="truncate max-w-[140px]">{prescription.doctorName}</span>
+                            </div>
+                            <div className="flex items-center whitespace-nowrap">
+                              <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                              <span>{formattedDate}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-earth-beige/60 pt-3">
+                          {prescription.notes ? (
+                            <p className="text-[11px] text-gray-600 line-clamp-1"><span className="font-medium text-gray-700">Notes:</span> {prescription.notes}</p>
+                          ) : (
+                            <div className="h-0.5" />
+                          )}
+
+                          <div className="sm:hidden flex items-center justify-between text-[11px] text-drift-gray">
+                            <div className="flex items-center">
+                              <ProfileImage userId={prescription.doctorId} role="doctor" size="xs" className="mr-1" />
+                              <span className="truncate max-w-[140px]">{prescription.doctorName}</span>
+                            </div>
+                            <div className="flex items-center ml-3">
+                              <Calendar className="mr-1 h-3.5 w-3.5" />
+                              <span>{formattedDate}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 sm:justify-end">
+                            <button onClick={() => handleViewPrescription(prescription)} className="rounded-lg border border-earth-beige bg-white px-3 py-1.5 text-[11px] font-medium text-graphite transition-colors hover:bg-pale-stone">Preview</button>
+                            <button onClick={() => handleDownloadPDF(prescription)} disabled={prescription.downloadedByPatient === true} className={`inline-flex items-center rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors ${prescription.downloadedByPatient === true ? "bg-gray-200 text-gray-500 cursor-not-allowed" : "bg-soft-amber text-white hover:bg-amber-600"}`}>
+                              <Download className="mr-1 h-3.5 w-3.5" />
+                              {prescription.downloadedByPatient === true ? "Downloaded" : "PDF"}
+                </button>
+              </div>
           </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
         ) : (
           <div className="rounded-lg border border-pale-stone bg-white p-8 text-center shadow-sm">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-pale-stone">
@@ -613,111 +1075,66 @@ export default function PatientPrescriptionsPage() {
 
       {/* Prescription Preview Modal */}
       {showPrescriptionModal && selectedPrescription && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fadeIn">
-          <div className="relative w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl">
-            {/* Modal header */}
-            <div className="flex items-center justify-between border-b border-pale-stone p-2">
-              <h3 className="text-xs font-medium text-graphite">Prescription Preview</h3>
-              <button
-                onClick={() => setShowPrescriptionModal(false)}
-                className="rounded-full p-1 text-drift-gray hover:bg-pale-stone"
-              >
-                <X className="h-4 w-4" />
-              </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 animate-fadeIn" data-modal-backdrop>
+          <div className="relative w-full max-w-xs sm:max-w-sm max-h-[95vh] flex flex-col rounded-lg bg-white shadow-xl overflow-hidden" data-modal-content>
+            {/* Modal header - no close button */}
+            <div className="flex items-center justify-center border-b border-pale-stone px-2 py-1.5 flex-shrink-0">
+              <h3 className="text-[10px] sm:text-xs font-medium text-graphite">Prescription Preview</h3>
             </div>
 
-            {/* Prescription preview - matching the new prescription page preview */}
-            <div className="p-3">
-              <div className="overflow-hidden rounded-lg border border-earth-beige bg-white">
-                <div className="p-3">
-                  <div className="relative border-b border-gray-300 pb-3 text-center">
-                    <div className="absolute left-0 top-0 text-xl font-bold italic text-soft-amber">Rx</div>
-                    <div className="doctor-info">
-                      <div className="text-sm font-bold">
-                        Dr. {selectedPrescription.doctorInfo?.name || selectedPrescription.doctorName || "Doctor Name"}
-                      </div>
-                      <div className="text-xs">
-                        {selectedPrescription.doctorInfo?.specialty || "General Practitioner"} | PRC #
-                        {selectedPrescription.doctorInfo?.licenseNumber || "License"}
-                      </div>
-                      <div className="text-xs">
-                        {selectedPrescription.doctorInfo?.clinicAddress || "Clinic Address"}
-                      </div>
-                      <div className="text-xs">
-                        Contact No.: {selectedPrescription.doctorInfo?.contactNumber || "Contact Number"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 space-y-1 text-xs">
-                    <div>Date: {new Date(selectedPrescription.createdAt || Date.now()).toLocaleDateString()}</div>
-                    <div>Patient Name: {patientInfo?.name || user?.displayName || "_______"}</div>
-                    <div>
-                      Age: {patientInfo?.age || calculateAge(patientInfo?.dateOfBirth) || "N/A"} &nbsp;&nbsp; Sex:{" "}
-                      {patientInfo?.gender || "Not specified"}
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <div className="text-sm font-bold text-soft-amber">Rx:</div>
-
-                    <div className="mt-1 space-y-2 text-xs">
-                      {selectedPrescription.medications && selectedPrescription.medications.length > 0 ? (
-                        selectedPrescription.medications.map((med, index) => (
-                          <div key={index} className="ml-2">
-                            <div>
-                              <span className="font-bold">{index + 1}.</span> {med.name}
-                            </div>
-                            <div className="ml-3">
-                              {med.dosage}, {med.frequency}, {med.duration}
-                            </div>
-                            {med.instructions && (
-                              <div className="ml-3 italic text-drift-gray text-xs">{med.instructions}</div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="ml-2 text-drift-gray italic">(No medications)</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-1 pt-4 text-xs">
-                    {selectedPrescription.signature ? (
-                      <div className="mb-1">
-                        <img
-                          src={selectedPrescription.signature || "/placeholder.svg"}
-                          alt="Signature"
-                          className="max-h-12"
-                        />
-                      </div>
-                    ) : (
-                      <div className="mb-2 border-b border-gray-400 w-32"></div>
-                    )}
-                    <div>Dr. {selectedPrescription.doctorInfo?.name || selectedPrescription.doctorName}</div>
-                    <div>License No.: PRC {selectedPrescription.doctorInfo?.licenseNumber || "License Number"}</div>
-                    <div>PTR No.: {selectedPrescription.doctorInfo?.ptrNumber || "PTR Number"}</div>
-                    <div>S2 No.: {selectedPrescription.doctorInfo?.s2Number || "S2 Number"}</div>
-                  </div>
-
-                  <div className="mt-4 border-t border-gray-300 pt-2 text-center text-xs text-gray-500">
-                    This prescription is electronically generated via Smart Care Health System
-                  </div>
+            {/* Prescription preview - using PrescriptionPreviewTemplate */}
+            <div className="p-1.5 sm:p-2 overflow-y-auto flex-1 min-h-0">
+              <div className="overflow-hidden rounded-lg border-2 border-gray-200 bg-white shadow-lg relative">
+                <div className="p-3 sm:p-4 bg-white relative max-w-full mx-auto" data-prescription-preview>
+                  <PrescriptionPreviewTemplate
+                    template={selectedPrescription.template || "classic"}
+                    isModal={true}
+                    formData={{
+                      // Use saved prescription data - exact same as doctor's live preview
+                      patientName: selectedPrescription.patientName || patientInfo?.name || user?.displayName || "",
+                      patientAddress: selectedPrescription.patientAddress || patientInfo?.address || "",
+                      patientAge: selectedPrescription.patientAge || String(patientInfo?.age || calculateAge(patientInfo?.dateOfBirth) || ""),
+                      patientGender: selectedPrescription.patientGender || patientInfo?.gender || "",
+                      medications: selectedPrescription.medications || [],
+                      notes: selectedPrescription.notes || "",
+                      signature: selectedPrescription.signature || null,
+                    }}
+                    doctorInfo={{
+                      // Use saved doctor info from prescription or fetch
+                      name: selectedPrescription.doctorInfo?.name || selectedPrescription.doctorName || "",
+                      specialty: selectedPrescription.doctorInfo?.specialty || selectedPrescription.doctorSpecialty || "",
+                      licenseNumber: selectedPrescription.doctorInfo?.licenseNumber || selectedPrescription.doctorLicenseNumber || "",
+                      clinicAddress: selectedPrescription.doctorInfo?.clinicAddress || selectedPrescription.doctorInfo?.officeAddress || "",
+                      contactNumber: selectedPrescription.doctorInfo?.contactNumber || selectedPrescription.doctorInfo?.phone || "",
+                      email: selectedPrescription.doctorInfo?.email || "",
+                      province: selectedPrescription.doctorInfo?.province || "",
+                      healthOffice: selectedPrescription.doctorInfo?.healthOffice || "",
+                    }}
+                    formatDate={(date) => {
+                      // Use prescription date exactly as saved (startDate or createdAt)
+                      const prescriptionDate = selectedPrescription.startDate || selectedPrescription.createdAt || date
+                      const dateObj = prescriptionDate?.seconds 
+                        ? new Date(prescriptionDate.seconds * 1000)
+                        : prescriptionDate?.toDate
+                        ? prescriptionDate.toDate()
+                        : new Date(prescriptionDate || date)
+                      // Format same as doctor's preview: MM/DD/YYYY
+                      const month = String(dateObj.getMonth() + 1).padStart(2, "0")
+                      const day = String(dateObj.getDate()).padStart(2, "0")
+                      const year = dateObj.getFullYear()
+                      return `${month}/${day}/${year}`
+                    }}
+                    isMobile={false}
+                  />
                 </div>
               </div>
             </div>
 
             {/* Modal footer */}
-            <div className="flex justify-end border-t border-pale-stone p-2">
-              <button
-                onClick={() => handleDownloadPDF(selectedPrescription)}
-                className="mr-2 rounded-md bg-soft-amber px-3 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-amber-600"
-              >
-                Download PDF
-              </button>
+            <div className="flex justify-end border-t border-pale-stone px-2 py-1.5 flex-shrink-0">
               <button
                 onClick={() => setShowPrescriptionModal(false)}
-                className="rounded-md border border-earth-beige bg-white px-3 py-1 text-xs font-medium text-graphite transition-colors hover:bg-pale-stone"
+                className="rounded-md border border-earth-beige bg-white px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium text-graphite shadow-sm transition-colors hover:bg-pale-stone"
               >
                 Close
               </button>

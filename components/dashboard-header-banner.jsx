@@ -12,6 +12,7 @@ export function DashboardHeaderBanner({
   actionButton,
   showDateTime = true,
   showMetrics = true,
+  nextCheckupDate = null, // Only show if patient has appointments
 }) {
   const { user } = useAuth()
   const [greeting, setGreeting] = useState("Good day")
@@ -87,7 +88,7 @@ export function DashboardHeaderBanner({
         </div>
 
         {showMetrics && (
-          <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+          <div className={`mt-4 grid gap-4 ${userRole === "doctor" ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4" : nextCheckupDate ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 md:grid-cols-3"}`}>
             {userRole === "doctor" ? (
               <>
                 <div className="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
@@ -112,15 +113,18 @@ export function DashboardHeaderBanner({
                     {new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
                   </p>
                 </div>
-                <div className="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
-                  <p className="text-xs font-medium uppercase text-white/70">Next Checkup</p>
-                  <p className="text-xl font-bold">
-                    {new Date(Date.now() + Math.random() * 15 * 86400000).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
+                {/* Only show Next Checkup if patient has appointments */}
+                {nextCheckupDate && (
+                  <div className="rounded-lg bg-white/10 p-3 backdrop-blur-sm">
+                    <p className="text-xs font-medium uppercase text-white/70">Next Checkup</p>
+                    <p className="text-xl font-bold">
+                      {nextCheckupDate.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  </div>
+                )}
               </>
             )}
           </div>

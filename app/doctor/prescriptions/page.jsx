@@ -26,6 +26,7 @@ import { getDoctorPrescriptions, updatePrescription, deletePrescription } from "
 import { useAuth } from "@/contexts/auth-context"
 import { generatePrescriptionPDF } from "@/lib/pdf-utils"
 import ProfileImage from "@/components/profile-image"
+import { PrescriptionPreviewTemplate } from "@/components/prescription-preview-templates"
 
 export default function DoctorPrescriptionsPage() {
   const { user } = useAuth()
@@ -33,12 +34,13 @@ export default function DoctorPrescriptionsPage() {
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterPatient, setFilterPatient] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
+  const [isClosingFilters, setIsClosingFilters] = useState(false)
   const [notification, setNotification] = useState({ message: "", isVisible: false })
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [currentPrescription, setCurrentPrescription] = useState(null)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
-  const [viewMode, setViewMode] = useState("list") // 'list' or 'grid'
+  const [viewMode, setViewMode] = useState("grid") // 'list' or 'grid'
   const [prescriptions, setPrescriptions] = useState([])
   const [loading, setLoading] = useState(true)
   const [patients, setPatients] = useState([])
@@ -305,8 +307,13 @@ export default function DoctorPrescriptionsPage() {
   }
 
   // Handle prescription PDF download
-  const handlePrintPrescription = (prescription) => {
+  const handlePrintPrescription = async (prescription) => {
     try {
+      if (prescription.downloadedByPatient === true) {
+        setNotification({ message: "This prescription has already been downloaded once.", isVisible: true })
+        return
+      }
+
       // Find the patient
       const patient = {
         name: prescription.patientName || prescription.patient,
@@ -323,10 +330,18 @@ export default function DoctorPrescriptionsPage() {
       const doc = generatePrescriptionPDF(prescription, doctorInfo, patient)
 
       // Save the PDF
-      doc.save(`prescription_${patient.name.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`)
+      doc.save(`prescription_${patient.name?.replace(/\s+/g, "_") || "patient"}_${new Date().toISOString().split("T")[0]}.pdf`)
+
+      // Mark as downloaded (one-time)
+      try {
+        await updatePrescription(prescription.id, { downloadedByPatient: true })
+        setPrescriptions((prev) => prev.map((p) => (p.id === prescription.id ? { ...p, downloadedByPatient: true } : p)))
+      } catch (e) {
+        console.warn("Failed to mark prescription as downloaded:", e)
+      }
 
       setNotification({
-        message: `Prescription for ${prescription.medication} downloaded successfully`,
+        message: `Prescription for ${prescription.medication || prescription.medications?.[0]?.name || "patient"} downloaded successfully`,
         isVisible: true,
       })
     } catch (error) {
@@ -465,87 +480,87 @@ export default function DoctorPrescriptionsPage() {
           return (
             <div
               key={prescription.id}
-              className={`overflow-hidden rounded-lg border-l-4 ${
-                status === "active"
-                  ? "border-l-green-400"
-                  : status === "expired"
-                    ? "border-l-amber-400"
-                    : "border-l-blue-400"
-              } border border-pale-stone bg-white shadow-sm transition-all hover:shadow-md ${
-                status === "active" ? "" : "opacity-90 hover:opacity-100"
-              }`}
+              className={`overflow-hidden rounded-xl border-2 border-amber-200/50 bg-gradient-to-br from-white via-amber-50/20 to-yellow-50/30 shadow-lg transition-all hover:shadow-xl hover:scale-[1.02]`}
               style={{
                 animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both`,
                 opacity: 0,
               }}
             >
-              <div className="p-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <Pill className={`mr-2 h-5 w-5 ${status === "active" ? "text-soft-amber" : "text-drift-gray"}`} />
-                    <h3 className="font-medium text-graphite text-sm">{prescription.medication}</h3>
+              <div className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-soft-amber/20 to-amber-50">
+                      <Pill className={`h-5 w-5 text-soft-amber`} />
                   </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-sm truncate">
+                        {prescription.medication || (prescription.medications?.[0]?.name || "Prescription")}
+                      </h3>
                   <span
-                    className={`rounded-full ${statusInfo.color} px-2 py-0.5 text-xs font-medium ${statusInfo.textColor}`}
+                        className={`inline-flex items-center gap-1 rounded-full ${statusInfo.color} px-2 py-0.5 text-[10px] font-medium ${statusInfo.textColor} mt-1`}
                   >
+                        {statusInfo.icon}
                     {statusInfo.label}
                   </span>
                 </div>
-
-                <div className="flex items-center mb-2">
-                  <ProfileImage userId={prescription.patientId} role="patient" size="xs" className="mr-2" />
-                  <span className="text-sm text-graphite">{prescription.patient}</span>
+                  </div>
                 </div>
 
-                <div className="flex items-center text-xs text-drift-gray mb-1">
-                  <Clock className="mr-1.5 h-3.5 w-3.5" />
-                  <span>{prescription.frequency}</span>
+                <div className="space-y-2 mb-4">
+                  <p className="text-xs text-gray-600">
+                    <span className="font-medium">Patient:</span> {prescription.patient}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    <span className="font-medium">Dosage:</span> {prescription.dosage || prescription.medications?.[0]?.dosage || "—"}
+                  </p>
+                  <p className="text-xs text-gray-600">
+                    <span className="font-medium">Frequency:</span> {prescription.frequency || prescription.medications?.[0]?.frequency || "—"}
+                  </p>
+                  {prescription.notes && (
+                    <p className="text-[10px] text-gray-500 line-clamp-2">
+                      <span className="font-medium text-gray-600">Notes:</span> {prescription.notes}
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex items-center text-xs text-drift-gray">
-                  <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                <div className="flex items-center gap-2 mb-4 pb-4 border-b border-amber-200/50">
+                  <ProfileImage userId={prescription.patientId} role="patient" size="xs" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-900 truncate">{prescription.patient}</p>
+                    <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                      <Calendar className="h-3 w-3" />
                   <span>{startDate}</span>
+                    </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between border-t border-earth-beige bg-pale-stone/30 px-3 py-1.5">
+                <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleViewPrescription(prescription)}
-                  className="text-xs text-drift-gray hover:text-graphite"
+                    className="flex-1 rounded-lg border-2 border-amber-200/50 bg-white px-3 py-2 text-xs font-semibold text-gray-900 transition-all hover:bg-amber-50 hover:border-amber-300"
                 >
                   Preview
                 </button>
-
-                <div className="flex space-x-1">
+                  {status === "active" && (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleConfirmDelete(prescription)
-                    }}
-                    className="rounded-md border border-red-200 bg-white px-2 py-0.5 text-xs font-medium text-red-500 transition-colors hover:bg-red-50"
-                  >
-                    Delete
-                  </button>
-                  {status === "expired" && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRenewPrescription(prescription)
-                      }}
-                      className="rounded-md bg-soft-amber px-2 py-0.5 text-xs font-medium text-white transition-colors hover:bg-amber-600"
+                      onClick={() => handlePrintPrescription(prescription)}
+                      disabled={prescription.downloadedByPatient === true}
+                      className={`flex-1 inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                        prescription.downloadedByPatient === true
+                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          : "bg-gradient-to-r from-soft-amber to-amber-500 text-white hover:from-amber-500 hover:to-amber-600"
+                      }`}
                     >
-                      Renew
+                      <Download className="mr-1 h-3.5 w-3.5" />
+                      {prescription.downloadedByPatient === true ? "Downloaded" : "PDF"}
                     </button>
                   )}
-                  {status === "active" && (
+                  {status !== "active" && (
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handlePrintPrescription(prescription)
-                      }}
-                      className="rounded-md bg-soft-amber px-2 py-0.5 text-xs font-medium text-white transition-colors hover:bg-amber-600"
+                      onClick={() => handleConfirmDelete(prescription)}
+                      className="flex-1 inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold border border-red-200 bg-white text-red-500 hover:bg-red-50"
                     >
-                      PDF
+                      Delete
                     </button>
                   )}
                 </div>
@@ -569,92 +584,108 @@ export default function DoctorPrescriptionsPage() {
           return (
             <div
               key={prescription.id}
-              className={`overflow-hidden rounded-lg border-l-4 ${
-                prescription.status === "active"
-                  ? "border-l-green-400"
-                  : prescription.status === "expired"
-                    ? "border-l-amber-400"
-                    : "border-l-blue-400"
-              } border border-pale-stone bg-white shadow-sm transition-all hover:shadow-md ${
-                prescription.status === "active" ? "" : "opacity-90 hover:opacity-100"
-              }`}
+              className={`group relative overflow-hidden rounded-xl border border-earth-beige bg-white shadow-sm transition-all hover:shadow-md hover:border-amber-200/80`}
               style={{
                 animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both`,
                 opacity: 0,
               }}
             >
-              <div className="flex flex-wrap items-center justify-between p-3">
-                <div className="flex items-center space-x-3 mb-2 sm:mb-0">
-                  <Pill
-                    className={`h-5 w-5 ${prescription.status === "active" ? "text-soft-amber" : "text-drift-gray"}`}
-                  />
-                  <div>
-                    <div className="flex items-center flex-wrap">
-                      <h3 className="font-medium text-graphite mr-2">{prescription.medication}</h3>
+              <div className="p-3 sm:p-4">
+                {/* Top row: icon + title + status + right meta */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-soft-amber/20 to-amber-50 flex-shrink-0">
+                    <Pill className="h-5 w-5 text-soft-amber" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-graphite truncate">{prescription.medication}</h3>
                       <span
-                        className={`rounded-full ${statusInfo.color} px-2 py-0.5 text-xs font-medium ${statusInfo.textColor}`}
+                        className={`inline-flex items-center gap-1 rounded-full ${statusInfo.color} px-2 py-0.5 text-[10px] font-medium ${statusInfo.textColor}`}
                       >
+                        {statusInfo.icon}
                         {statusInfo.label}
                       </span>
                     </div>
-                    <p className="text-xs text-drift-gray">
-                      {prescription.dosage}, {prescription.frequency}
-                    </p>
+                    <div className="mt-0.5 text-xs text-drift-gray truncate">
+                      {prescription.dosage || prescription.medications?.[0]?.dosage || "—"}, {prescription.frequency || prescription.medications?.[0]?.frequency || "—"}
+                  </div>
+                </div>
+                  <div className="hidden sm:flex items-center gap-3 text-xs text-drift-gray">
+                  <div className="flex items-center">
+                    <ProfileImage userId={prescription.patientId} role="patient" size="xs" className="mr-1.5" />
+                      <span className="truncate max-w-[140px]">{prescription.patient}</span>
+                  </div>
+                    <div className="flex items-center whitespace-nowrap">
+                      <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                      <span>{startDate}</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-4">
+                {/* Bottom row: notes + doctor/date (mobile) + actions */}
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-t border-earth-beige/60 pt-3">
+                  {prescription.notes ? (
+                    <p className="text-[11px] text-gray-600 line-clamp-1">
+                      <span className="font-medium text-gray-700">Notes:</span> {prescription.notes}
+                    </p>
+                  ) : (
+                    <div className="h-0.5" />
+                  )}
+
+                  <div className="sm:hidden flex items-center justify-between text-[11px] text-drift-gray">
                   <div className="flex items-center">
-                    <ProfileImage userId={prescription.patientId} role="patient" size="xs" className="mr-1.5" />
-                    <span className="text-xs text-drift-gray">{prescription.patient}</span>
+                      <ProfileImage userId={prescription.patientId} role="patient" size="xs" className="mr-1" />
+                      <span className="truncate max-w-[140px]">{prescription.patient}</span>
                   </div>
-                  <div className="flex items-center">
-                    <Calendar
-                      className={`mr-1.5 h-3.5 w-3.5 ${
-                        prescription.status === "active" ? "text-soft-amber" : "text-drift-gray"
-                      }`}
-                    />
-                    <span className="text-xs text-drift-gray">{startDate}</span>
-                  </div>
+                    <div className="flex items-center ml-3">
+                      <Calendar className="mr-1 h-3.5 w-3.5" />
+                      <span>{startDate}</span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end space-x-2 border-t border-earth-beige bg-pale-stone/30 px-3 py-1.5">
+                  <div className="flex items-center gap-2 sm:justify-end">
                 <button
                   onClick={() => handleViewPrescription(prescription)}
-                  className="rounded-md border border-earth-beige bg-white px-2.5 py-1 text-xs font-medium text-graphite transition-colors hover:bg-pale-stone"
+                      className="rounded-lg border border-earth-beige bg-white px-3 py-1.5 text-[11px] font-medium text-graphite transition-colors hover:bg-pale-stone"
                 >
                   Preview
                 </button>
                 <button
                   onClick={() => handleConfirmDelete(prescription)}
-                  className="rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-500 transition-colors hover:bg-red-50"
+                      className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-[11px] font-medium text-red-500 transition-colors hover:bg-red-50"
                 >
                   Delete
                 </button>
-                {prescription.status === "expired" && (
-                  <button
-                    onClick={() => handleRenewPrescription(prescription)}
-                    className="rounded-md bg-soft-amber px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600"
-                  >
-                    Renew
-                  </button>
-                )}
                 {prescription.status === "active" && (
                   <button
                     onClick={() => handlePrintPrescription(prescription)}
-                    className="inline-flex items-center rounded-md bg-soft-amber px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600"
+                        disabled={prescription.downloadedByPatient === true}
+                        className={`inline-flex items-center rounded-lg px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                          prescription.downloadedByPatient === true
+                            ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                            : "bg-soft-amber text-white hover:bg-amber-600"
+                        }`}
                   >
                     <Download className="mr-1 h-3.5 w-3.5" />
-                    PDF
+                        {prescription.downloadedByPatient === true ? "Downloaded" : "PDF"}
                   </button>
                 )}
+                  </div>
+                </div>
               </div>
             </div>
           )
         })}
       </div>
     )
+  }
+
+  const handleCloseFilters = () => {
+    setIsClosingFilters(true)
+    setTimeout(() => {
+      setShowFilters(false)
+      setIsClosingFilters(false)
+    }, 300)
   }
 
   return (
@@ -687,7 +718,7 @@ export default function DoctorPrescriptionsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-drift-gray" />
           <input
             type="text"
-            placeholder="Search by patient, medication, or notes..."
+            placeholder="Search by patient or medication..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full rounded-md border border-earth-beige bg-white py-2 pl-10 pr-3 text-graphite placeholder:text-drift-gray/60 focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
@@ -695,43 +726,50 @@ export default function DoctorPrescriptionsPage() {
         </div>
         <div className="flex space-x-2">
           <button
-            onClick={toggleViewMode}
-            className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite shadow-sm transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
+            onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-graphite shadow-sm transition-all hover:bg-amber-50 hover:border-amber-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
           >
             {viewMode === "list" ? (
               <>
-                <LayoutGrid className="mr-2 h-4 w-4" />
+                <LayoutGrid className="h-4 w-4" />
                 Grid View
               </>
             ) : (
               <>
-                <LayoutList className="mr-2 h-4 w-4" />
+                <LayoutList className="h-4 w-4" />
                 List View
               </>
             )}
           </button>
           <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite shadow-sm transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
+            onClick={() => {
+              if (showFilters) {
+                handleCloseFilters()
+              } else {
+                setShowFilters(true)
+              }
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-4 py-2.5 text-sm font-medium text-graphite shadow-sm transition-all hover:bg-amber-50 hover:border-amber-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
           >
-            <SlidersHorizontal className="mr-2 h-4 w-4" />
+            <SlidersHorizontal className="h-4 w-4" />
             Filters
             {(filterStatus !== "all" || filterPatient !== "all") && (
-              <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-soft-amber text-xs text-white">
-                {(filterStatus !== "all" ? 1 : 0) + (filterPatient !== "all" ? 1 : 0)}
-              </span>
+              <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-soft-amber to-amber-500 text-xs font-bold text-white shadow-md">1</span>
             )}
           </button>
         </div>
       </div>
 
-      {showFilters && (
-        <div className="rounded-lg border border-earth-beige bg-white p-4 shadow-sm animate-slideDown">
-          <div className="flex flex-col space-y-4 sm:flex-row sm:items-end sm:space-x-4 sm:space-y-0">
-            <div className="flex-1 space-y-2">
-              <label htmlFor="filterStatus" className="text-sm font-medium text-graphite">
-                Status
-              </label>
+      {/* Filters with smooth animation */}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          showFilters ? "max-h-96 opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-2 pointer-events-none"
+        }`}
+      >
+        <div className="rounded-lg border border-amber-200 bg-white p-4 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <label htmlFor="filterStatus" className="text-sm font-medium text-graphite">Status</label>
               <select
                 id="filterStatus"
                 value={filterStatus}
@@ -744,55 +782,91 @@ export default function DoctorPrescriptionsPage() {
                 <option value="completed">Completed</option>
               </select>
             </div>
-            <div className="flex-1 space-y-2">
-              <label htmlFor="filterPatient" className="text-sm font-medium text-graphite">
-                Patient
-              </label>
+            <div className="space-y-2">
+              <label htmlFor="filterPatient" className="text-sm font-medium text-graphite">Patient</label>
               <select
                 id="filterPatient"
                 value={filterPatient}
                 onChange={(e) => setFilterPatient(e.target.value)}
                 className="w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
               >
-                <option value="all">All Patients</option>
-                {patients.map((patient) => (
-                  <option key={patient.id} value={patient.id.toString()}>
-                    {patient.name}
-                  </option>
+                <option value="all">All</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             </div>
-            <div className="flex-1 space-y-2">
-              <label htmlFor="itemsPerPage" className="text-sm font-medium text-graphite">
-                Items Per Page
-              </label>
-              <select
-                id="itemsPerPage"
-                value={itemsPerPage}
-                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
+            <div className="flex items-end">
+              <button
+                onClick={() => {
+                  setFilterStatus("all")
+                  setFilterPatient("all")
+                  setSearchTerm("")
+                }}
+                className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
               >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={15}>15</option>
-              </select>
+                Clear Filters
+              </button>
             </div>
-            <button
-              onClick={clearFilters}
-              className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
-            >
-              Clear Filters
-            </button>
           </div>
         </div>
-      )}
+      </div>
 
       <div className="space-y-6">
-        {filteredPrescriptions.length > 0 ? (
+        {loading ? (
+          <div className="rounded-lg border border-pale-stone bg-white p-8 text-center shadow-sm">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-pale-stone">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="32"
+                height="32"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-drift-gray"
+              >
+                <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" />
+                <path d="M12 15V12" />
+                <path d="M12 9V6" />
+              </svg>
+            </div>
+            <p className="text-graphite">Loading prescriptions...</p>
+          </div>
+        ) : filteredPrescriptions.length > 0 ? (
           <>
-            {viewMode === "list" ? (
-              <>
-                {renderListView(paginatedPrescriptions)}
+            {viewMode === "grid" ? (
+              // Group by status only when no filters/search
+              (filterStatus === "all" && filterPatient === "all" && !searchTerm) ? (
+                <>
+                  {filteredPrescriptions.some((p) => p.status === "active") && (
+                    <div className="space-y-4 animate-fadeIn">
+                      <h2 className="text-lg font-semibold text-graphite">Active Prescriptions</h2>
+                      {renderGridPrescription(filteredPrescriptions, "active")}
+                    </div>
+                  )}
+                  {filteredPrescriptions.some((p) => p.status === "expired") && (
+                    <div className="space-y-4 animate-fadeIn">
+                      <h2 className="text-lg font-semibold text-graphite">Expired Prescriptions</h2>
+                      {renderGridPrescription(filteredPrescriptions, "expired")}
+                    </div>
+                  )}
+                  {filteredPrescriptions.some((p) => p.status === "completed") && (
+                    <div className="space-y-4 animate-fadeIn">
+                      <h2 className="text-lg font-semibold text-graphite">Completed Prescriptions</h2>
+                      {renderGridPrescription(filteredPrescriptions, "completed")}
+                    </div>
+                  )}
+                </>
+              ) : (
+                // If filtered, render a flat grid of the filtered prescriptions
+                renderGridPrescription(filteredPrescriptions, filterStatus === "all" ? "active" : filterStatus)
+              )
+            ) : (
+              renderListView(filteredPrescriptions)
+            )}
 
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
@@ -844,176 +918,109 @@ export default function DoctorPrescriptionsPage() {
                 )}
               </>
             ) : (
-              <>
-                {/* Active Prescriptions */}
-                {filteredPrescriptions.some((p) => p.status === "active") && (
-                  <div className="space-y-4 animate-fadeIn">
-                    <h2 className="text-lg font-semibold text-graphite">Active Prescriptions</h2>
-                    {renderGridPrescription(filteredPrescriptions, "active")}
-                  </div>
-                )}
-
-                {/* Expired Prescriptions */}
-                {filteredPrescriptions.some((p) => p.status === "expired") && (
-                  <div className="space-y-4 animate-fadeIn">
-                    <h2 className="text-lg font-semibold text-graphite">Expired Prescriptions</h2>
-                    {renderGridPrescription(filteredPrescriptions, "expired")}
-                  </div>
-                )}
-
-                {/* Completed Prescriptions */}
-                {filteredPrescriptions.some((p) => p.status === "completed") && (
-                  <div className="space-y-4 animate-fadeIn">
-                    <h2 className="text-lg font-semibold text-graphite">Completed Prescriptions</h2>
-                    {renderGridPrescription(filteredPrescriptions, "completed")}
-                  </div>
-                )}
-              </>
+              <div className="rounded-lg border border-pale-stone bg-white p-8 text-center shadow-sm">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-pale-stone">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="32"
+                    height="32"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-drift-gray"
+                  >
+                    <path d="M8 21h8a2 2 0 0 0 2-2v-2H6v2a2 2 0 0 0 2 2Z" />
+                    <path d="M19 7v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7" />
+                    <path d="M21 10V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2l3 3h12l3-3Z" />
+                    <path d="M10 2v4" />
+                    <path d="M14 2v4" />
+                  </svg>
+                </div>
+                <h3 className="mb-1 text-lg font-medium text-graphite">No Prescriptions Found</h3>
+                <p className="mb-4 text-drift-gray">
+                  {searchTerm || filterStatus !== "all" || filterPatient !== "all"
+                    ? "No prescriptions match your search criteria. Try adjusting your filters."
+                    : "You haven't created any prescriptions yet. Create your first prescription now."}
+                </p>
+                <Link
+                  href="/doctor/prescriptions/new"
+                  className="rounded-md bg-soft-amber px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
+                >
+                  Create Prescription
+                </Link>
+              </div>
             )}
-          </>
-        ) : (
-          <div className="rounded-lg border border-pale-stone bg-white p-8 text-center shadow-sm">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-pale-stone">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="32"
-                height="32"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-drift-gray"
-              >
-                <path d="M8 21h8a2 2 0 0 0 2-2v-2H6v2a2 2 0 0 0 2 2Z" />
-                <path d="M19 7v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V7" />
-                <path d="M21 10V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2l3 3h12l3-3Z" />
-                <path d="M10 2v4" />
-                <path d="M14 2v4" />
-              </svg>
-            </div>
-            <h3 className="mb-1 text-lg font-medium text-graphite">No Prescriptions Found</h3>
-            <p className="mb-4 text-drift-gray">
-              {searchTerm || filterStatus !== "all" || filterPatient !== "all"
-                ? "No prescriptions match your search criteria. Try adjusting your filters."
-                : "You haven't created any prescriptions yet. Create your first prescription now."}
-            </p>
-            <Link
-              href="/doctor/prescriptions/new"
-              className="rounded-md bg-soft-amber px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
-            >
-              Create Prescription
-            </Link>
           </div>
-        )}
-      </div>
 
       {/* Prescription Preview Modal */}
       {showPrescriptionModal && currentPrescription && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-fadeIn">
-          <div className="relative w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 animate-fadeIn">
+          <div className="relative w-full max-w-xs sm:max-w-sm max-h-[95vh] flex flex-col rounded-lg bg-white shadow-xl overflow-hidden">
             {/* Modal header */}
-            <div className="flex items-center justify-between border-b border-pale-stone p-2">
-              <h3 className="text-xs font-medium text-graphite">Prescription Preview</h3>
-              <button
-                onClick={() => setShowPrescriptionModal(false)}
-                className="rounded-full p-1 text-drift-gray hover:bg-pale-stone"
-              >
-                <X className="h-4 w-4" />
-              </button>
+            <div className="flex items-center justify-center border-b border-pale-stone px-2 py-1.5 flex-shrink-0">
+              <h3 className="text-[10px] sm:text-xs font-medium text-graphite">Prescription Preview</h3>
             </div>
 
-            {/* Prescription preview - matching the new prescription page preview */}
-            <div className="p-3">
-              <div className="overflow-hidden rounded-lg border border-earth-beige bg-white">
-                <div className="p-3">
-                  <div className="relative border-b border-gray-300 pb-3 text-center">
-                    <div className="absolute left-0 top-0 text-xl font-bold italic text-soft-amber">Rx</div>
-                    <div className="doctor-info">
-                      <div className="text-sm font-bold">
-                        Dr. {doctorInfo?.name || user?.displayName || "Doctor Name"}
-                      </div>
-                      <div className="text-xs">
-                        {doctorInfo?.specialty || "General Practitioner"} | PRC #
-                        {doctorInfo?.licenseNumber || "License"}
-                      </div>
-                      <div className="text-xs">{doctorInfo?.clinicAddress || "Clinic Address"}</div>
-                      <div className="text-xs">Contact No.: {doctorInfo?.contactNumber || "Contact Number"}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 space-y-1 text-xs">
-                    <div>Date: {new Date(currentPrescription.createdAt || Date.now()).toLocaleDateString()}</div>
-                    <div>
-                      Patient Name: {currentPrescription.patientName || currentPrescription.patient || "_______"}
-                    </div>
-                    <div>
-                      Age: {currentPrescription.patientAge || "____"} &nbsp;&nbsp; Sex:{" "}
-                      {currentPrescription.patientGender || "____"}
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <div className="text-sm font-bold text-soft-amber">Rx:</div>
-
-                    <div className="mt-1 space-y-2 text-xs">
-                      {currentPrescription.medications && currentPrescription.medications.length > 0 ? (
-                        currentPrescription.medications.map((med, index) => (
-                          <div key={index} className="ml-2">
-                            <div>
-                              <span className="font-bold">{index + 1}.</span> {med.name}
-                            </div>
-                            <div className="ml-3">
-                              {med.dosage}, {med.frequency}, {med.duration}
-                            </div>
-                            {med.instructions && (
-                              <div className="ml-3 italic text-drift-gray text-xs">{med.instructions}</div>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="ml-2 text-drift-gray italic">(No medications)</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-1 pt-4 text-xs">
-                    {currentPrescription.signature ? (
-                      <div className="mb-1">
-                        <img
-                          src={currentPrescription.signature || "/placeholder.svg"}
-                          alt="Signature"
-                          className="max-h-12"
+            {/* Prescription preview - using PrescriptionPreviewTemplate */}
+            <div className="p-1.5 sm:p-2 overflow-y-auto flex-1 min-h-0">
+              <div className="overflow-hidden rounded-lg border-2 border-gray-200 bg-white shadow-lg relative">
+                <div className="p-3 sm:p-4 bg-white relative max-w-full mx-auto" data-prescription-preview>
+                  <PrescriptionPreviewTemplate
+                    template={currentPrescription.template || "classic"}
+                    isModal={true}
+                    formData={{
+                      patientName: currentPrescription.patientName || currentPrescription.patient || "",
+                      patientAddress: currentPrescription.patientAddress || "",
+                      patientAge: currentPrescription.patientAge || "",
+                      patientGender: currentPrescription.patientGender || "",
+                      medications: currentPrescription.medications || [
+                        {
+                          name: currentPrescription.medication,
+                          dosage: currentPrescription.dosage,
+                          frequency: currentPrescription.frequency,
+                          duration: currentPrescription.duration,
+                          instructions: currentPrescription.notes,
+                        },
+                      ],
+                      notes: currentPrescription.notes || "",
+                      signature: currentPrescription.signature || null,
+                    }}
+                    doctorInfo={{
+                      name: doctorInfo?.name || user?.displayName || "",
+                      specialty: doctorInfo?.specialty || "",
+                      licenseNumber: doctorInfo?.licenseNumber || "",
+                      clinicAddress: doctorInfo?.clinicAddress || doctorInfo?.officeAddress || "",
+                      contactNumber: doctorInfo?.contactNumber || doctorInfo?.phone || "",
+                      email: doctorInfo?.email || "",
+                      province: doctorInfo?.province || "",
+                      healthOffice: doctorInfo?.healthOffice || "",
+                    }}
+                    formatDate={(date) => {
+                      const prescriptionDate = currentPrescription.startDate || currentPrescription.createdAt || date
+                      const dateObj = prescriptionDate?.seconds
+                        ? new Date(prescriptionDate.seconds * 1000)
+                        : prescriptionDate?.toDate
+                        ? prescriptionDate.toDate()
+                        : new Date(prescriptionDate || date)
+                      const month = String(dateObj.getMonth() + 1).padStart(2, "0")
+                      const day = String(dateObj.getDate()).padStart(2, "0")
+                      const year = dateObj.getFullYear()
+                      return `${month}/${day}/${year}`
+                    }}
+                    isMobile={false}
                         />
                       </div>
-                    ) : (
-                      <div className="mb-2 border-b border-gray-400 w-32"></div>
-                    )}
-                    <div>Dr. {doctorInfo?.name || user?.displayName}</div>
-                    <div>License No.: PRC {doctorInfo?.licenseNumber || "License Number"}</div>
-                    <div>PTR No.: {doctorInfo?.ptrNumber || "PTR Number"}</div>
-                    <div>S2 No.: {doctorInfo?.s2Number || "S2 Number"}</div>
-                  </div>
-
-                  <div className="mt-4 border-t border-gray-300 pt-2 text-center text-xs text-gray-500">
-                    This prescription is electronically generated via Smart Care Health System
-                  </div>
-                </div>
               </div>
             </div>
 
             {/* Modal footer */}
-            <div className="flex justify-end border-t border-pale-stone p-2">
-              <button
-                onClick={() => handlePrintPrescription(currentPrescription)}
-                className="mr-2 rounded-md bg-soft-amber px-3 py-1 text-xs font-medium text-white shadow-sm transition-colors hover:bg-amber-600"
-              >
-                Download PDF
-              </button>
+            <div className="flex justify-end border-t border-pale-stone px-2 py-1.5 flex-shrink-0">
               <button
                 onClick={() => setShowPrescriptionModal(false)}
-                className="rounded-md border border-earth-beige bg-white px-3 py-1 text-xs font-medium text-graphite transition-colors hover:bg-pale-stone"
+                className="rounded-md border border-earth-beige bg-white px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium text-graphite transition-colors hover:bg-pale-stone"
               >
                 Close
               </button>

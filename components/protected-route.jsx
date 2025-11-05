@@ -5,10 +5,28 @@ import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 
 // Add check for user status
-export function ProtectedRoute({ children, allowedRoles = [] }) {
+export function ProtectedRoute({ children, allowedRoles = [], requiredRole }) {
   const { user, userRole, loading, userStatus } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
+
+  // Normalize roles: support legacy requiredRole (string) or allowedRoles (array)
+  const normalizedAllowedRoles = Array.isArray(allowedRoles) && allowedRoles.length > 0
+    ? allowedRoles
+    : (requiredRole ? [requiredRole] : [])
+
+  // Persist last allowed path so Access Denied can send users back
+  useEffect(() => {
+    if (loading) return
+    const hasAccess = !!user && userStatus !== 0 && (normalizedAllowedRoles.length === 0 || normalizedAllowedRoles.includes(userRole))
+    if (hasAccess) {
+      try {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("lastAllowedPath", pathname)
+        }
+      } catch (_) {}
+    }
+  }, [loading, user, userRole, userStatus, pathname, normalizedAllowedRoles])
 
   useEffect(() => {
     if (!loading) {
@@ -17,12 +35,12 @@ export function ProtectedRoute({ children, allowedRoles = [] }) {
       } else if (userStatus === 0) {
         // If user is pending approval, redirect to waiting page
         router.push("/waiting-approval")
-      } else if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
+      } else if (normalizedAllowedRoles.length > 0 && !normalizedAllowedRoles.includes(userRole)) {
         // If user doesn't have the required role, show access denied
         router.push("/access-denied")
       }
     }
-  }, [user, userRole, loading, router, pathname, allowedRoles, userStatus])
+  }, [user, userRole, loading, router, pathname, normalizedAllowedRoles, userStatus])
 
   if (loading) {
     return (
@@ -32,7 +50,7 @@ export function ProtectedRoute({ children, allowedRoles = [] }) {
     )
   }
 
-  if (!user || (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) || userStatus === 0) {
+  if (!user || (normalizedAllowedRoles.length > 0 && !normalizedAllowedRoles.includes(userRole)) || userStatus === 0) {
     return null
   }
 

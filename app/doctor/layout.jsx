@@ -7,8 +7,12 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { useMobile } from "@/hooks/use-mobile"
 import { usePathname } from "next/navigation"
 import CallNotification from "@/components/call-notification"
+import { NotificationListener } from "@/components/notification-listener"
+import { useAuth } from "@/contexts/auth-context"
+import SessionTimeoutListener from "@/components/session-timeout-listener"
 
 export default function DoctorLayout({ children }) {
+  const { user } = useAuth()
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const isMobile = useMobile()
   const pathname = usePathname()
@@ -44,11 +48,15 @@ export default function DoctorLayout({ children }) {
     <ProtectedRoute requiredRole="doctor">
       <div className="min-h-screen bg-pale-stone">
         <DoctorTopNav showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
-        <main className="container mx-auto px-4 pb-20 pt-24 md:px-6 md:pb-12">
+        <main className="mx-auto w-full max-w-screen-2xl px-3 pb-20 pt-24 md:px-4 md:pb-12 lg:px-6 xl:px-8">
           <div className={`${isPageTransitioning ? "opacity-0" : "page-transition-enter"}`}>{content}</div>
         </main>
         {isMobile && <DoctorMobileNav />}
         <CallNotification />
+        {/* Notification Listener for Push Notifications - Available on all doctor pages */}
+        {user && <NotificationListener userId={user.uid} enabled={true} />}
+        {user && <SessionTimeoutListener userId={user.uid} />}
+        {/* Suspicious verification modal will open from settings page only */}
       </div>
     </ProtectedRoute>
   )

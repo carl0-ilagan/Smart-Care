@@ -720,11 +720,45 @@ export default function NotificationsPage() {
                     </span>
                   </div>
                   <p className="text-sm text-drift-gray mb-2">{notification.message}</p>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-drift-gray">{format(notification.time, "MMM d, yyyy 'at' h:mm a")}</p>
-                    {notification.doctorName && (
-                      <span className="text-xs font-medium text-soft-amber">{notification.doctorName}</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {notification.doctorName && (
+                        <span className="text-xs font-medium text-soft-amber">{notification.doctorName}</span>
+                      )}
+                      {notification.type === "call_invite" && notification.actionLink && (
+                        <button
+                          onClick={async (e) => {
+                            try {
+                              const callId = notification.metadata?.callId
+                              if (!callId) {
+                                window.location.assign("/dashboard/appointments")
+                                return
+                              }
+                              const callRef = doc(db, "calls", callId)
+                              const snap = await getDoc(callRef)
+                              if (!snap.exists()) {
+                                window.location.assign("/dashboard/appointments")
+                                return
+                              }
+                              const data = snap.data() || {}
+                              const isActive = data.status === "pending" || data.status === "active"
+                              const notRevoked = !data.revokedBy
+                              if (isActive && notRevoked) {
+                                window.location.assign(notification.actionLink)
+                              } else {
+                                window.location.assign("/dashboard/appointments")
+                              }
+                            } catch {
+                              window.location.assign("/dashboard/appointments")
+                            }
+                          }}
+                          className="inline-flex items-center rounded-md bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-200"
+                        >
+                          Join Room
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

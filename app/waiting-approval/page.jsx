@@ -3,16 +3,23 @@
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { Clock, Mail, Phone, AlertCircle, Shield, Bell } from "lucide-react"
+import { Clock, Mail, Phone, AlertCircle, Shield, Bell, Home } from "lucide-react"
 import { doc, onSnapshot, collection, query, where, getDocs, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import Link from "next/link"
+import { sendApprovalNotification, sendRejectionNotification } from "@/lib/email-service"
+import { LogoutConfirmation } from "@/components/logout-confirmation"
 
 export default function WaitingApprovalPage() {
-  const { user, userRole, userStatus } = useAuth()
+  const { user, userRole, userStatus, logout } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
-  const [adminContact, setAdminContact] = useState({ email: "", phone: "" })
+  const [adminContact, setAdminContact] = useState({ 
+    email: "smartcarephofficial@gmail.com", 
+    phone: "09979866482" 
+  })
   const [isVisible, setIsVisible] = useState(false)
   const [animationStep, setAnimationStep] = useState(0)
+  const [showLogoutModal, setShowLogoutModal] = useState(false)
   const router = useRouter()
 
   // Animation refs
@@ -21,35 +28,24 @@ export default function WaitingApprovalPage() {
   const orbit2Ref = useRef(null)
   const notificationRef = useRef(null)
 
-  // Fetch admin contact information
+  // Fetch admin contact information (optional, keeping static info)
   useEffect(() => {
     const fetchAdminContact = async () => {
       try {
         // Query for admin users
         const adminQuery = query(collection(db, "users"), where("role", "==", "admin"), limit(1))
-
         const querySnapshot = await getDocs(adminQuery)
 
         if (!querySnapshot.empty) {
           const adminData = querySnapshot.docs[0].data()
           setAdminContact({
-            email: adminData.email || "admin@smartcare.com",
-            phone: adminData.phone || "+1 (800) 555-1234",
-          })
-        } else {
-          // Fallback values if no admin found
-          setAdminContact({
-            email: "admin@smartcare.com",
-            phone: "+1 (800) 555-1234",
+            email: adminData.email || "smartcarephofficial@gmail.com",
+            phone: adminData.phone || "09979866482",
           })
         }
       } catch (error) {
         console.error("Error fetching admin contact:", error)
-        // Fallback values on error
-        setAdminContact({
-          email: "admin@smartcare.com",
-          phone: "+1 (800) 555-1234",
-        })
+        // Keep default values on error
       }
     }
 
@@ -64,12 +60,22 @@ export default function WaitingApprovalPage() {
     }
 
     // Set up real-time listener for user status
-    const unsubscribe = onSnapshot(doc(db, "users", user.uid), (doc) => {
+    const unsubscribe = onSnapshot(doc(db, "users", user.uid), async (doc) => {
       if (doc.exists()) {
         const userData = doc.data()
+        const prevStatus = userStatus
+        const newStatus = userData.status
 
-        // If user is approved, redirect to appropriate dashboard
-        if (userData.status === 1) {
+        // If user is approved
+        if (newStatus === 1 && prevStatus !== 1) {
+          // Send approval email
+          try {
+            await sendApprovalNotification(user.email || userData.email, userData.role)
+          } catch (error) {
+            console.error("Error sending approval email:", error)
+          }
+          
+          // Redirect to appropriate dashboard
           if (userData.role === "patient") {
             router.push("/dashboard")
           } else if (userData.role === "doctor") {
@@ -77,8 +83,18 @@ export default function WaitingApprovalPage() {
           } else if (userData.role === "admin") {
             router.push("/admin/dashboard")
           }
-        } else if (userData.status === 2) {
+        } else if (newStatus === 2 && prevStatus !== 2) {
           // If user is rejected
+          try {
+            await sendRejectionNotification(
+              user.email || userData.email, 
+              userData.role,
+              adminContact.email
+            )
+          } catch (error) {
+            console.error("Error sending rejection email:", error)
+          }
+          
           router.push("/account-rejected")
         }
       }
@@ -87,7 +103,7 @@ export default function WaitingApprovalPage() {
     })
 
     return () => unsubscribe()
-  }, [user, router])
+  }, [user, userStatus, router, adminContact])
 
   // Animation effects
   useEffect(() => {
@@ -174,9 +190,34 @@ export default function WaitingApprovalPage() {
     )
   }
 
+  const handleLogoutAndGoHome = async () => {
+    try {
+      await logout()
+      router.push("/")
+    } catch (error) {
+      console.error("Error logging out:", error)
+    }
+  }
+
+  const confirmLogout = () => {
+    setShowLogoutModal(true)
+  }
+
+  const handleLogoutConfirm = () => {
+    setShowLogoutModal(false)
+    handleLogoutAndGoHome()
+  }
+
   return (
     <div className="min-h-screen bg-pale-stone flex flex-col items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+      {/* Enhanced logout confirmation modal */}
+      <LogoutConfirmation
+        isOpen={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleLogoutConfirm}
+      />
+
+      <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 max-w-md w-full">
         {/* Main animation container */}
         <div className="relative h-48 w-full mb-6 flex justify-center">
           {/* Central floating lock */}
@@ -197,7 +238,7 @@ export default function WaitingApprovalPage() {
                   }`}
                 />
                 <div
-                  className={`absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-yellow-500 text-white transition-all delay-500 duration-500 ${
+                  className={`absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-orange-500 text-white transition-all delay-500 duration-500 ${
                     isVisible ? "scale-100" : "scale-0"
                   }`}
                 >
@@ -209,9 +250,9 @@ export default function WaitingApprovalPage() {
 
           {/* Orbiting shield icon */}
           <div ref={orbit1Ref} className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <div className="bg-soft-amber/10 rounded-full p-2 shadow-md">
+            <div className="bg-orange-500/10 rounded-full p-2 shadow-md">
               <Shield
-                className={`h-6 w-6 text-soft-amber transition-all duration-300 ${
+                className={`h-6 w-6 text-orange-500 transition-all duration-300 ${
                   animationStep === 0 ? "scale-110" : "scale-100"
                 }`}
               />
@@ -233,20 +274,20 @@ export default function WaitingApprovalPage() {
 
           {/* Decorative particles */}
           <div className="absolute -top-4 right-10 animate-float-slow">
-            <div className="bg-soft-amber/10 rounded-full p-1.5">
-              <div className="h-3 w-3 rounded-full bg-soft-amber/30"></div>
+            <div className="bg-orange-500/10 rounded-full p-1.5">
+              <div className="h-3 w-3 rounded-full bg-orange-500/30"></div>
             </div>
           </div>
 
           <div className="absolute bottom-0 left-10 animate-float-slow-delay">
-            <div className="bg-soft-amber/10 rounded-full p-1.5">
-              <div className="h-3 w-3 rounded-full bg-soft-amber/30"></div>
+            <div className="bg-orange-500/10 rounded-full p-1.5">
+              <div className="h-3 w-3 rounded-full bg-orange-500/30"></div>
             </div>
           </div>
 
           <div className="absolute -bottom-8 right-16 animate-float-slow-delay-more">
-            <div className="bg-soft-amber/10 rounded-full p-1.5">
-              <div className="h-3 w-3 rounded-full bg-soft-amber/30"></div>
+            <div className="bg-orange-500/10 rounded-full p-1.5">
+              <div className="h-3 w-3 rounded-full bg-orange-500/30"></div>
             </div>
           </div>
         </div>
@@ -269,13 +310,13 @@ export default function WaitingApprovalPage() {
         </p>
 
         <div
-          className={`py-4 px-6 bg-yellow-50 border border-yellow-200 rounded-lg mb-6 transition-all duration-500 delay-300 ${
+          className={`py-4 px-6 bg-orange-50 border border-orange-200 rounded-lg mb-6 transition-all duration-500 delay-300 ${
             isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
           }`}
         >
           <div className="flex items-start">
-            <Clock className="h-5 w-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-yellow-700">
+            <Clock className="h-5 w-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-orange-700">
               <span className="font-medium block mb-1">Waiting for admin approval</span>
               Your account will be reviewed by our administrators. This process typically takes 24-48 hours. You will
               need to log back in to check your approval status.
@@ -288,17 +329,24 @@ export default function WaitingApprovalPage() {
             isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
           }`}
         >
-          <p className="font-medium text-graphite mb-2 text-center">Need assistance?</p>
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-2 sm:space-y-0 sm:space-x-4">
-            <a href={`mailto:${adminContact.email}`} className="flex items-center text-soft-amber hover:underline">
-              <Mail className="h-4 w-4 mr-1" />
-              <span>{adminContact.email}</span>
-            </a>
-            <a href={`tel:${adminContact.phone}`} className="flex items-center text-soft-amber hover:underline">
-              <Phone className="h-4 w-4 mr-1" />
-              <span>{adminContact.phone}</span>
-            </a>
+          <p className="font-medium text-graphite mb-3 text-center">Need assistance?</p>
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center justify-center text-sm">
+              <Mail className="h-4 w-4 mr-2 text-drift-gray" />
+              <span className="text-drift-gray">{adminContact.email}</span>
+            </div>
+            <div className="flex items-center justify-center text-sm">
+              <Phone className="h-4 w-4 mr-2 text-drift-gray" />
+              <span className="text-drift-gray">{adminContact.phone}</span>
+            </div>
           </div>
+          <button
+            onClick={confirmLogout}
+            className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
+          >
+            <Home className="h-5 w-5" />
+            Back to Home
+          </button>
         </div>
       </div>
 

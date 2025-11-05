@@ -31,7 +31,8 @@ import { updateLastLogin } from "@/lib/firebase-utils"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { storage } from "@/lib/firebase"
 import { logPatientActivity, logDoctorActivity } from "@/lib/activity-logs"
-import { checkSuspiciousLogin, logFailedLoginAttempt } from "@/lib/security-utils"
+// import { checkSuspiciousLogin, logFailedLoginAttempt } from "@/lib/security-utils"
+import { logFailedLoginAttempt } from "@/lib/security-utils"
 import { createOrUpdateSession } from "@/lib/session-management"
 
 const AuthContext = createContext({})
@@ -260,38 +261,38 @@ export const AuthProvider = ({ children }) => {
         // Create sample notifications
         createSampleNotifications(user.uid, userData.role)
 
-        // Create or update session and check for suspicious login
+        // Create or update session
         const sessionInfo = await createOrUpdateSession(user.uid, userData.email || user.email)
 
-        // Check if this login is suspicious
-        const deviceInfo = {
-          deviceName: sessionInfo.deviceName,
-          deviceType: sessionInfo.deviceType,
-          userAgent: navigator.userAgent,
-        }
+        // Suspicious login check disabled - causing false positives
+        // const deviceInfo = {
+        //   deviceName: sessionInfo.deviceName,
+        //   deviceType: sessionInfo.deviceType,
+        //   userAgent: navigator.userAgent,
+        // }
 
-        const securityCheck = await checkSuspiciousLogin(user.uid, sessionInfo.ipAddress, deviceInfo)
+        // const securityCheck = await checkSuspiciousLogin(user.uid, sessionInfo.ipAddress, deviceInfo)
 
-        if (securityCheck.isSuspicious) {
-          setSuspiciousLogin({
-            ...securityCheck,
-            ipAddress: sessionInfo.ipAddress,
-            deviceInfo,
-          })
+        // if (securityCheck.isSuspicious) {
+        //   setSuspiciousLogin({
+        //     ...securityCheck,
+        //     ipAddress: sessionInfo.ipAddress,
+        //     deviceInfo,
+        //   })
 
-          // Log the suspicious login to the user's activity
-          if (userData.role === "patient") {
-            await logPatientActivity("Suspicious Login", `Suspicious login detected from ${deviceInfo.deviceName}`, {
-              id: user.uid,
-              email: userData.email || user.email,
-            })
-          } else if (userData.role === "doctor") {
-            await logDoctorActivity("Suspicious Login", `Suspicious login detected from ${deviceInfo.deviceName}`, {
-              id: user.uid,
-              email: userData.email || user.email,
-            })
-          }
-        }
+        //   // Log the suspicious login to the user's activity
+        //   if (userData.role === "patient") {
+        //     await logPatientActivity("Suspicious Login", `Suspicious login detected from ${deviceInfo.deviceName}`, {
+        //       id: user.uid,
+        //       email: userData.email || user.email,
+        //     })
+        //   } else if (userData.role === "doctor") {
+        //     await logDoctorActivity("Suspicious Login", `Suspicious login detected from ${deviceInfo.deviceName}`, {
+        //       id: user.uid,
+        //       email: userData.email || user.email,
+        //     })
+        //   }
+        // }
       } else {
         // If user exists in Auth but not in Firestore, create a basic record
         const userData = {
@@ -406,38 +407,38 @@ export const AuthProvider = ({ children }) => {
         updateLastLogin(user.uid)
       }
 
-      // Create or update session and check for suspicious login
+      // Create or update session
       const sessionInfo = await createOrUpdateSession(user.uid, user.email)
 
-      // Check if this login is suspicious
-      const deviceInfo = {
-        deviceName: sessionInfo.deviceName,
-        deviceType: sessionInfo.deviceType,
-        userAgent: navigator.userAgent,
-      }
+      // Suspicious login check disabled - causing false positives
+      // const deviceInfo = {
+      //   deviceName: sessionInfo.deviceName,
+      //   deviceType: sessionInfo.deviceType,
+      //   userAgent: navigator.userAgent,
+      // }
 
-      const securityCheck = await checkSuspiciousLogin(user.uid, sessionInfo.ipAddress, deviceInfo)
+      // const securityCheck = await checkSuspiciousLogin(user.uid, sessionInfo.ipAddress, deviceInfo)
 
-      if (securityCheck.isSuspicious) {
-        setSuspiciousLogin({
-          ...securityCheck,
-          ipAddress: sessionInfo.ipAddress,
-          deviceInfo,
-        })
+      // if (securityCheck.isSuspicious) {
+      //   setSuspiciousLogin({
+      //     ...securityCheck,
+      //     ipAddress: sessionInfo.ipAddress,
+      //     deviceInfo,
+      //   })
 
-        // Log the suspicious login to the user's activity
-        if (userData.role === "patient") {
-          await logPatientActivity("Suspicious Login", `Suspicious login detected from ${deviceInfo.deviceName}`, {
-            id: user.uid,
-            email: userData.email || user.email,
-          })
-        } else if (userData.role === "doctor") {
-          await logDoctorActivity("Suspicious Login", `Suspicious login detected from ${deviceInfo.deviceName}`, {
-            id: user.uid,
-            email: userData.email || user.email,
-          })
-        }
-      }
+      //   // Log the suspicious login to the user's activity
+      //   if (userData.role === "patient") {
+      //     await logPatientActivity("Suspicious Login", `Suspicious login detected from ${deviceInfo.deviceName}`, {
+      //       id: user.uid,
+      //       email: userData.email || user.email,
+      //     })
+      //   } else if (userData.role === "doctor") {
+      //     await logDoctorActivity("Suspicious Login", `Suspicious login detected from ${deviceInfo.deviceName}`, {
+      //       id: user.uid,
+      //       email: userData.email || user.email,
+      //     })
+      //   }
+      // }
 
       return user
     } catch (error) {
@@ -459,8 +460,22 @@ export const AuthProvider = ({ children }) => {
         clearInterval(window.sessionHeartbeat)
       }
 
-      // Get the current session token
+      // Get the current session token and user ID
       const sessionToken = localStorage.getItem("sessionToken")
+      const userId = auth.currentUser?.uid
+
+      // Update user status to offline in Firestore FIRST
+      if (userId) {
+        try {
+          const userDocRef = doc(db, "users", userId)
+          await updateDoc(userDocRef, {
+            isOnline: false,
+          })
+        } catch (error) {
+          console.error("Error updating user status to offline:", error)
+          // Continue with logout even if status update fails
+        }
+      }
 
       if (sessionToken) {
         // Find and remove the session from Firestore
@@ -481,7 +496,8 @@ export const AuthProvider = ({ children }) => {
       }
 
       await signOut(auth)
-      router.push("/login")
+      // Redirect to the welcome page
+      router.push("/")
     } catch (error) {
       throw error
     }

@@ -18,6 +18,8 @@ import {
   SlidersHorizontal,
   Share2,
   Users,
+  LayoutGrid,
+  LayoutList,
 } from "lucide-react"
 import { PatientRecordModal } from "@/components/patient-record-modal"
 import { UploadMedicalRecordModal } from "@/components/upload-medical-record-modal"
@@ -27,12 +29,14 @@ import { getPatientMedicalRecords, getMedicalRecordById, deleteMedicalRecord } f
 import { SuccessNotification } from "@/components/success-notification"
 import { AppointmentHistory } from "@/components/appointment-history"
 import { DashboardHeaderBanner } from "@/components/dashboard-header-banner"
+import PaginationControls from "@/components/pagination-controls"
 
 export default function PatientRecordsPage() {
   const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [filterType, setFilterType] = useState("all")
   const [showFilters, setShowFilters] = useState(false)
+  const [isClosingFilters, setIsClosingFilters] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [showRecordModal, setShowRecordModal] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -50,6 +54,8 @@ export default function PatientRecordsPage() {
   const [filterDate, setFilterDate] = useState("")
   const [viewMode, setViewMode] = useState("grid") // grid or list
   const [activeTab, setActiveTab] = useState("records")
+  const [currentPage, setCurrentPage] = useState(1)
+  const recordsPerPage = 9
 
   // Load medical records
   useEffect(() => {
@@ -190,15 +196,58 @@ export default function PatientRecordsPage() {
     setSearchTerm("")
     setFilterType("all")
     setFilterDate("")
+    setCurrentPage(1)
+  }
+
+  // Handle filter toggle with smooth animation
+  const handleToggleFilters = () => {
+    if (showFilters) {
+      setIsClosingFilters(true)
+      setTimeout(() => {
+        setShowFilters(false)
+        setIsClosingFilters(false)
+      }, 300)
+    } else {
+      setShowFilters(true)
+      setIsClosingFilters(false)
+    }
+  }
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterType, filterDate, searchTerm])
+
+  // Ensure default view is grid whenever switching back to Records tab
+  useEffect(() => {
+    if (activeTab === "records") {
+      setViewMode("grid")
+    }
+  }, [activeTab])
+
+  // Calculate pagination
+  const indexOfLastRecord = currentPage * recordsPerPage
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage
+  const totalPages = Math.ceil(filteredRecords.length / recordsPerPage)
+  const displayedRecords = filteredRecords.slice(indexOfFirstRecord, indexOfLastRecord)
+
+  // Handle page change
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber)
+    // Scroll to top of records section
+    const recordsSection = document.getElementById("records-section")
+    if (recordsSection) {
+      recordsSection.scrollIntoView({ behavior: "smooth" })
+    }
   }
 
   // Create upload button for header
   const uploadButton = (
     <button
       onClick={() => setShowUploadModal(true)}
-      className="inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-medium text-soft-amber shadow-sm transition-all hover:bg-amber-50 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 animate-fadeIn"
+      className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-soft-amber to-amber-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:shadow-lg hover:from-amber-500 hover:to-amber-600 transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2 animate-fadeIn"
     >
-      <Plus className="mr-2 h-4 w-4" />
+      <Plus className="h-4 w-4" />
       Upload Record
     </button>
   )
@@ -268,86 +317,83 @@ export default function PatientRecordsPage() {
               />
             </div>
             <div className="flex space-x-2">
-              <button
-                onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-                className="inline-flex items-center rounded-md border border-earth-beige bg-white px-3 py-2 text-sm font-medium text-graphite shadow-sm transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
-              >
-                {viewMode === "grid" ? (
-                  <>
-                    <FileText className="mr-2 h-4 w-4" />
-                    List View
-                  </>
-                ) : (
-                  <>
-                    <div className="mr-2 grid grid-cols-2 gap-0.5">
-                      <div className="h-1.5 w-1.5 rounded-sm bg-graphite"></div>
-                      <div className="h-1.5 w-1.5 rounded-sm bg-graphite"></div>
-                      <div className="h-1.5 w-1.5 rounded-sm bg-graphite"></div>
-                      <div className="h-1.5 w-1.5 rounded-sm bg-graphite"></div>
-                    </div>
-                    Grid View
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="inline-flex items-center rounded-md border border-earth-beige bg-white px-3 py-2 text-sm font-medium text-graphite shadow-sm transition-colors hover:bg-pale-stone focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2"
-              >
-                <SlidersHorizontal className="mr-2 h-4 w-4" />
-                Filters
-                {(filterType !== "all" || filterDate) && (
-                  <span className="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-soft-amber text-xs text-white">
-                    {(filterType !== "all" ? 1 : 0) + (filterDate ? 1 : 0)}
-                  </span>
-                )}
-              </button>
+          <button
+            onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+            className="inline-flex items-center gap-2 rounded-lg border-2 border-amber-200 bg-white px-4 py-2.5 text-sm font-semibold text-graphite shadow-sm transition-all hover:bg-amber-50 hover:border-soft-amber/50 hover:shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
+          >
+            {viewMode === "list" ? (
+              <>
+                <LayoutGrid className="h-4 w-4" />
+                Grid View
+              </>
+            ) : (
+              <>
+                <LayoutList className="h-4 w-4" />
+                List View
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleToggleFilters}
+            className="inline-flex items-center gap-2 rounded-lg border-2 border-amber-200 bg-white px-4 py-2.5 text-sm font-semibold text-graphite shadow-sm transition-all hover:bg-amber-50 hover:border-soft-amber/50 hover:shadow-md transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            {(filterType !== "all" || filterDate) && (
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-soft-amber to-amber-500 text-xs font-bold text-white shadow-md">
+                {(filterType !== "all" ? 1 : 0) + (filterDate ? 1 : 0)}
+              </span>
+            )}
+          </button>
             </div>
           </div>
 
-          {showFilters && (
-            <div className="rounded-lg border border-earth-beige bg-white p-4 shadow-sm animate-slideDown">
-              <div className="flex flex-col space-y-4 sm:flex-row sm:items-end sm:space-x-4 sm:space-y-0">
-                <div className="flex-1 space-y-2">
-                  <label htmlFor="filterType" className="text-sm font-medium text-graphite">
-                    Record Type
-                  </label>
-                  <select
-                    id="filterType"
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
-                  >
-                    <option value="all">All Types</option>
-                    {recordTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex-1 space-y-2">
-                  <label htmlFor="filterDate" className="text-sm font-medium text-graphite">
-                    Record Date
-                  </label>
-                  <input
-                    id="filterDate"
-                    type="date"
-                    value={filterDate}
-                    onChange={(e) => setFilterDate(e.target.value)}
-                    className="w-full rounded-md border border-earth-beige bg-white py-2 px-3 text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber"
-                  ></input>
-                </div>
-
-                <button
-                  onClick={clearFilters}
-                  className="inline-flex items-center rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
-                >
-                  Clear Filters
-                </button>
-              </div>
+      {showFilters && (
+        <div className={`rounded-lg border border-amber-200 bg-white p-4 shadow-md transition-all duration-300 ${
+          isClosingFilters ? "animate-slideUp opacity-0" : "animate-slideDown opacity-100"
+        }`}>
+          <div className="flex flex-col space-y-4 sm:flex-row sm:items-end sm:space-x-4 sm:space-y-0">
+            <div className="flex-1 space-y-2">
+              <label htmlFor="filterType" className="text-sm font-semibold text-graphite">
+                Record Type
+              </label>
+              <select
+                id="filterType"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                className="w-full rounded-lg border border-amber-200 bg-white py-2 px-3 text-sm text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber transition-all shadow-sm hover:shadow-md"
+              >
+                <option value="all">All Types</option>
+                {recordTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
             </div>
-          )}
+
+            <div className="flex-1 space-y-2">
+              <label htmlFor="filterDate" className="text-sm font-semibold text-graphite">
+                Record Date
+              </label>
+              <input
+                id="filterDate"
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="w-full rounded-lg border border-amber-200 bg-white py-2 px-3 text-sm text-graphite focus:border-soft-amber focus:outline-none focus:ring-1 focus:ring-soft-amber transition-all shadow-sm hover:shadow-md"
+              />
+            </div>
+
+            <button
+              onClick={clearFilters}
+              className="inline-flex items-center gap-2 rounded-lg border-2 border-amber-200 bg-white px-4 py-2.5 text-sm font-semibold text-graphite transition-all hover:bg-amber-50 hover:border-soft-amber/50 shadow-sm hover:shadow-md transform hover:scale-105"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+      )}
 
           {loading ? (
             // Loading state
@@ -358,19 +404,28 @@ export default function PatientRecordsPage() {
               </div>
             </div>
           ) : filteredRecords.length > 0 ? (
-            viewMode === "grid" ? (
+            <>
+            {viewMode === "grid" ? (
               // Grid view
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-fadeIn">
-                {filteredRecords.map((record, index) => (
+              <div id="records-section" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-fadeIn">
+                {displayedRecords.map((record, index) => (
                   <div
                     key={record.id}
-                    className="group overflow-hidden rounded-lg border border-pale-stone bg-white shadow-sm transition-all hover:shadow-md hover:border-soft-amber/30"
+                    className="group relative overflow-hidden rounded-2xl border border-amber-200/50 bg-gradient-to-br from-white to-amber-50/30 shadow-lg backdrop-blur-sm transition-all duration-300 hover:shadow-2xl hover:shadow-amber-500/20 hover:-translate-y-2 hover:border-amber-300/60"
                     style={{
-                      animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both`,
+                      animation: `fadeInUp 0.6s ease-out ${index * 0.05}s both`,
                       opacity: 0,
                     }}
                   >
-                    <div className="relative aspect-[4/3] overflow-hidden bg-pale-stone">
+                    {/* Decorative circles */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    {/* Top bar accent */}
+                    <div className="relative h-2 w-full bg-gradient-to-r from-soft-amber via-amber-500 to-soft-amber overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
+                    </div>
+                    
+                    <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-pale-stone to-amber-50/50">
                       {record.thumbnail && record.fileType.startsWith("image/") ? (
                         <img
                           src={record.thumbnail || "/placeholder.svg"}
@@ -378,17 +433,17 @@ export default function PatientRecordsPage() {
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center">
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-amber-50 to-amber-100/50">
                           <div className="text-center">
-                            {getFileIcon(record.fileType)}
-                            <div className="mt-2 text-sm font-medium text-drift-gray">
+                            <div className="mx-auto mb-2">{getFileIcon(record.fileType)}</div>
+                            <div className="text-xs sm:text-sm font-medium text-soft-amber">
                               {record.fileType ? record.fileType.split("/")[1].toUpperCase() : "Unknown"}
                             </div>
                           </div>
                         </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-                      <div className="absolute bottom-0 left-0 right-0 flex justify-end p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                      <div className="absolute bottom-0 left-0 right-0 flex justify-end p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 z-10">
                         <button
                           onClick={() => handleViewRecord(record)}
                           className="rounded-full bg-white p-2 text-soft-amber shadow-md transition-transform hover:scale-105 hover:bg-soft-amber hover:text-white"
@@ -415,56 +470,69 @@ export default function PatientRecordsPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="p-4">
-                      <div className="mb-2 flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-graphite line-clamp-1">{record.name}</h3>
-                          <div className="mt-1 flex items-center">
-                            <span className="inline-flex items-center rounded-full bg-soft-amber/10 px-2.5 py-0.5 text-xs font-medium text-soft-amber">
-                              {record.type}
-                            </span>
-                            <span className="ml-2 text-xs text-drift-gray">{formatFileSize(record.fileSize)}</span>
-                          </div>
+                    <div className="p-5 relative z-10">
+                      <div className="mb-3">
+                        <h3 className="font-bold text-graphite text-base line-clamp-1 group-hover:text-soft-amber transition-colors">{record.name}</h3>
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center rounded-full bg-gradient-to-r from-soft-amber/20 to-amber-50 border border-soft-amber/30 px-2.5 py-1 text-xs font-semibold text-soft-amber">
+                            {record.type}
+                          </span>
+                          <span className="flex items-center text-xs text-drift-gray font-medium">
+                            <Tag className="mr-1 h-3 w-3" />
+                            {formatFileSize(record.fileSize)}
+                          </span>
                         </div>
                       </div>
-                      <div className="mt-3 flex items-center justify-between text-xs text-drift-gray">
-                        <div className="flex items-center">
-                          <Calendar className="mr-1 h-3 w-3" />
-                          <span>{new Date(record.date).toLocaleDateString()}</span>
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 rounded-lg bg-white/90 backdrop-blur-sm px-2.5 py-1.5 border border-amber-200 shadow-sm">
+                          <Calendar className="h-3.5 w-3.5 text-soft-amber" />
+                          <span className="font-semibold text-graphite">
+                            {new Date(record.date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </span>
                         </div>
                         {record.sharedWith && record.sharedWith.length > 0 && (
-                          <div className="flex items-center text-blue-500">
-                            <Users className="mr-1 h-3 w-3" />
-                            <span>
-                              Shared with {record.sharedWith.length}{" "}
-                              {record.sharedWith.length === 1 ? "doctor" : "doctors"}
+                          <div className="flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 border border-blue-200">
+                            <Users className="h-3.5 w-3.5 text-blue-600" />
+                            <span className="font-semibold text-blue-700 text-xs">
+                              {record.sharedWith.length} {record.sharedWith.length === 1 ? "doctor" : "doctors"}
                             </span>
                           </div>
                         )}
                       </div>
                     </div>
+                    {/* Decorative corner accent */}
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-amber-500/5 to-transparent rounded-bl-full pointer-events-none"></div>
                   </div>
                 ))}
               </div>
             ) : (
               // List view
-              <div className="space-y-3 animate-fadeIn">
-                {filteredRecords.map((record, index) => (
+              <div id="records-section" className="space-y-3 sm:space-y-4 animate-fadeIn">
+                {displayedRecords.map((record, index) => (
                   <div
                     key={record.id}
-                    className="overflow-hidden rounded-lg border border-pale-stone bg-white shadow-sm transition-all hover:shadow-md hover:border-soft-amber/30"
+                    className="group relative overflow-hidden rounded-lg sm:rounded-2xl border-l-4 border-soft-amber border border-amber-200/30 sm:border-amber-200/50 bg-white sm:bg-gradient-to-br sm:from-white sm:to-amber-50/30 p-3 sm:p-6 shadow-sm sm:shadow-lg backdrop-blur-sm transition-all duration-300 hover:shadow-md sm:hover:shadow-xl hover:shadow-amber-500/20 hover:-translate-y-0.5 sm:hover:-translate-y-1 hover:border-amber-300/60"
                     style={{
-                      animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both`,
+                      animation: `fadeInUp 0.6s ease-out ${index * 0.05}s both`,
                       opacity: 0,
                     }}
                   >
-                    <div className="flex flex-col sm:flex-row">
-                      <div className="flex h-24 w-full items-center justify-center bg-pale-stone/30 sm:w-24">
+                    {/* Decorative background pattern - hidden on mobile */}
+                    <div className="hidden sm:block absolute right-0 top-0 h-32 w-32 bg-white/20 rounded-full -mr-16 -mt-16 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div className="hidden sm:block absolute bottom-0 left-0 h-24 w-24 bg-white/20 rounded-full -ml-12 -mb-12 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    
+                    <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                      <div className="flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-lg sm:rounded-xl bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200/50 sm:border-amber-200 flex-shrink-0">
                         {record.thumbnail && record.fileType.startsWith("image/") ? (
                           <img
                             src={record.thumbnail || "/placeholder.svg"}
                             alt={record.name}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-cover rounded-lg sm:rounded-xl"
                           />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center">
@@ -472,63 +540,79 @@ export default function PatientRecordsPage() {
                           </div>
                         )}
                       </div>
-                      <div className="flex flex-1 flex-col p-4">
-                        <div className="mb-2">
-                          <h3 className="font-medium text-graphite">{record.name}</h3>
-                          <div className="mt-1 flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center rounded-full bg-soft-amber/10 px-2.5 py-0.5 text-xs font-medium text-soft-amber">
-                              {record.type}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center flex-wrap gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+                          <h3 className="text-sm sm:text-lg font-semibold text-graphite group-hover:text-amber-600 transition-colors truncate">{record.name}</h3>
+                          <span className="inline-flex items-center rounded-full bg-gradient-to-r from-soft-amber/20 to-amber-50 border border-soft-amber/30 px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-soft-amber">
+                            {record.type}
+                          </span>
+                        </div>
+                        
+                        {/* Date and Time - Minimalist on mobile */}
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 mb-2 sm:mb-3">
+                          <div className="flex items-center gap-1 sm:gap-2 rounded-md sm:rounded-lg bg-amber-50/50 sm:bg-white/90 backdrop-blur-sm px-2 py-1 sm:px-3 sm:py-2 border border-amber-200/50 sm:border-amber-200 shadow-sm sm:shadow-md hover:shadow-md sm:hover:shadow-lg transition-all">
+                            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-soft-amber" />
+                            <span className="text-xs sm:text-sm font-semibold text-graphite whitespace-nowrap">
+                              <span className="sm:hidden">{new Date(record.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                              <span className="hidden sm:inline">{new Date(record.date).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</span>
                             </span>
-                            <span className="flex items-center text-xs text-drift-gray">
-                              <Calendar className="mr-1 h-3 w-3" />
-                              {new Date(record.date).toLocaleDateString()}
-                            </span>
-                            <span className="flex items-center text-xs text-drift-gray">
-                              <Clock className="mr-1 h-3 w-3" />
-                              {new Date(record.uploadedDate).toLocaleDateString()}
-                            </span>
-                            <span className="flex items-center text-xs text-drift-gray">
-                              <Tag className="mr-1 h-3 w-3" />
-                              {formatFileSize(record.fileSize)}
-                            </span>
-                            {record.sharedWith && record.sharedWith.length > 0 && (
-                              <span className="flex items-center text-xs text-blue-500">
-                                <Users className="mr-1 h-3 w-3" />
-                                Shared with {record.sharedWith.length}
-                              </span>
-                            )}
                           </div>
+                          <div className="hidden sm:flex items-center gap-2 rounded-lg bg-white/90 backdrop-blur-sm px-3 py-2 border border-amber-200 shadow-md hover:shadow-lg transition-all">
+                            <Tag className="h-4 w-4 text-soft-amber" />
+                            <span className="text-sm font-semibold text-graphite">{formatFileSize(record.fileSize)}</span>
+                          </div>
+                          {record.sharedWith && record.sharedWith.length > 0 && (
+                            <div className="hidden sm:flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1 border border-blue-200">
+                              <Users className="h-3.5 w-3.5 text-blue-600" />
+                              <span className="font-semibold text-blue-700 text-xs">
+                                {record.sharedWith.length} {record.sharedWith.length === 1 ? "doctor" : "doctors"}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        {record.notes && <p className="text-sm text-drift-gray line-clamp-1">{record.notes}</p>}
-                        <div className="mt-auto flex justify-end space-x-2 pt-2">
-                          <button
-                            onClick={() => handleViewRecord(record)}
-                            className="rounded-md border border-earth-beige bg-white px-3 py-1 text-xs font-medium text-graphite transition-colors hover:bg-pale-stone"
-                          >
-                            <Eye className="mr-1 inline-block h-3 w-3" />
-                            View
-                          </button>
-                          <button
-                            onClick={() => handleShareRecord(record)}
-                            className="rounded-md border border-blue-300 bg-white px-3 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
-                          >
-                            <Share2 className="mr-1 inline-block h-3 w-3" />
-                            Share
-                          </button>
-                          <button
-                            onClick={() => handleDeleteConfirm(record)}
-                            className="rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
-                          >
-                            <Trash2 className="mr-1 inline-block h-3 w-3" />
-                            Delete
-                          </button>
-                        </div>
+                        
+                        {record.notes && <p className="hidden sm:block text-sm text-drift-gray line-clamp-1">{record.notes}</p>}
+                      </div>
+                      </div>
+                      
+                      {/* Action Buttons - minimalist on mobile */}
+                      <div className="flex flex-row sm:flex-col gap-2 flex-wrap">
+                        <button
+                          onClick={() => handleViewRecord(record)}
+                          className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-lg border-2 border-amber-200 bg-white px-2.5 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-semibold text-graphite hover:bg-amber-50 hover:border-soft-amber/50 transition-all transform hover:scale-105 shadow-sm hover:shadow-md"
+                        >
+                          <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          <span className="hidden sm:inline">View</span>
+                        </button>
+                        <button
+                          onClick={() => handleShareRecord(record)}
+                          className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-lg border-2 border-blue-300 bg-white px-2.5 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-semibold text-blue-600 hover:bg-blue-50 hover:border-blue-400 transition-all transform hover:scale-105 shadow-sm hover:shadow-md"
+                        >
+                          <Share2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          <span className="hidden sm:inline">Share</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteConfirm(record)}
+                          className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-lg border-2 border-red-500 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-2.5 py-1.5 sm:px-3 sm:py-2 text-[10px] sm:text-xs font-semibold text-white shadow-lg hover:shadow-xl transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        >
+                          <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          <span className="hidden sm:inline">Delete</span>
+                        </button>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            )
+            )}
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <PaginationControls 
+                currentPage={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={handlePageChange} 
+              />
+            )}
+            </>
           ) : (
             <div className="rounded-lg border border-pale-stone bg-white p-8 text-center shadow-sm animate-fadeIn">
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-pale-stone">
@@ -542,9 +626,9 @@ export default function PatientRecordsPage() {
               </p>
               <button
                 onClick={() => setShowUploadModal(true)}
-                className="inline-flex items-center rounded-md bg-soft-amber px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-amber-600"
+                className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-soft-amber to-amber-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:from-amber-500 hover:to-amber-600 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-soft-amber focus:ring-offset-2 transform hover:scale-105"
               >
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="h-4 w-4" />
                 Upload Your First Record
               </button>
             </div>
@@ -666,8 +750,38 @@ export default function PatientRecordsPage() {
           }
         }
         
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        
+        @keyframes slideUp {
+          from {
+            opacity: 1;
+            transform: translateY(0);
+            max-height: 500px;
+          }
+          to {
+            opacity: 0;
+            transform: translateY(-10px);
+            max-height: 0;
+          }
+        }
+        
+        .animate-slideUp {
+          animation: slideUp 0.3s ease-out forwards;
+        }
+        
         .animate-fadeIn {
           animation: fadeIn 0.5s ease-out;
+        }
+        
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
         }
         
         .animate-slideDown {

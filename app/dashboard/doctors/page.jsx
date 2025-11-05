@@ -217,6 +217,10 @@ export default function DoctorsDirectory() {
                           <span className="text-xl font-bold">{doctor.displayName.charAt(0)}</span>
                         </div>
                       )}
+                      <span
+                        className={`absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full ring-2 ring-white ${doctor.isOnline ? "bg-green-500" : "bg-gray-400"}`}
+                        title={doctor.isOnline ? "Online" : "Offline"}
+                      />
                     </div>
                   </Link>
 

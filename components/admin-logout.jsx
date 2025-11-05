@@ -4,19 +4,20 @@ import { useState } from "react"
 import { LogOut, AlertTriangle } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { LogoutConfirmation } from "@/components/logout-confirmation"
+import { useAuth } from "@/contexts/AuthContext"
 
 export function AdminLogout() {
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false)
   const router = useRouter()
+  const { logout } = useAuth()
 
   const handleLogout = () => {
     setShowLogoutConfirmation(true)
   }
 
   const confirmLogout = () => {
-    // In a real application, this would call an API to invalidate the session
-    // For now, we'll just redirect to the login page
-    router.push("/login")
+    // Call the logout function from the AuthContext
+    logout()
     setShowLogoutConfirmation(false)
   }
 

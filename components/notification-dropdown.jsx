@@ -111,10 +111,15 @@ export function NotificationDropdown() {
           // Filter notifications based on user settings
           const filteredNotifications = notificationsData.filter((notification) => {
             const settings = userSettings.notifications
+            const type = notification.type
 
-            switch (notification.type) {
-              case "appointment":
-                return settings.appointments
+            // Handle appointment-related notification types
+            if (type === "appointment" || type === "appointment_request" || type === "appointment_scheduled" || 
+                type === "appointment_approved" || type === "appointment_cancelled" || type === "appointment_rescheduled") {
+              return settings.appointments
+            }
+            
+            switch (type) {
               case "message":
                 return settings.messages
               case "prescription":
@@ -269,9 +274,21 @@ export function NotificationDropdown() {
     // Determine the correct link based on user role and notification type
     const basePath = isDoctor ? "/doctor" : "/dashboard"
 
+    // If notification has actionLink, use it (but only for appointment notifications, not call_invite)
+    // This prevents accidental redirects to call room from appointment bookings
+    if (notification.actionLink && notification.type !== "call_invite") {
+      // Only use actionLink if it's a safe route (not a call room)
+      if (!notification.actionLink.includes("/calls/room/") && !notification.actionLink.includes("/room/")) {
+        return notification.actionLink
+      }
+    }
+
     switch (notification.type) {
       case "appointment":
         return `${basePath}/appointments`
+      case "call_invite":
+        // We'll intercept clicks for call_invite to validate room status first
+        return notification.actionLink || `${basePath}/appointments`
       case "message":
         return isDoctor ? `${basePath}/chat` : `${basePath}/messages`
       case "prescription":
@@ -295,6 +312,34 @@ export function NotificationDropdown() {
     )
   }
 
+  const handleCallInviteClick = async (notification, e) => {
+    try {
+      if (notification.type !== "call_invite") return
+      if (e && typeof e.preventDefault === "function") e.preventDefault()
+      const callId = notification.metadata?.callId
+      if (!callId) {
+        window.location.assign(isDoctor ? "/doctor/appointments" : "/dashboard/appointments")
+        return
+      }
+      const callRef = doc(db, "calls", callId)
+      const snap = await getDoc(callRef)
+      if (!snap.exists()) {
+        window.location.assign(isDoctor ? "/doctor/appointments" : "/dashboard/appointments")
+        return
+      }
+      const data = snap.data() || {}
+      const isActive = data.status === "pending" || data.status === "active"
+      const notRevoked = !data.revokedBy
+      if (isActive && notRevoked) {
+        window.location.assign(notification.actionLink || (isDoctor ? "/doctor/appointments" : "/dashboard/appointments"))
+      } else {
+        window.location.assign(isDoctor ? "/doctor/appointments" : "/dashboard/appointments")
+      }
+    } catch {
+      window.location.assign(isDoctor ? "/doctor/appointments" : "/dashboard/appointments")
+    }
+  }
+
   return (
     <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-md border border-pale-stone bg-white shadow-lg z-50">
       <div className="p-2 bg-white">
@@ -315,12 +360,41 @@ export function NotificationDropdown() {
                   key={notification.id}
                   href={getNotificationLink(notification)}
                   className={`block p-3 transition-colors hover:bg-pale-stone ${!notification.read ? "bg-soft-amber/5" : ""}`}
-                  onClick={() => markAsRead(notification.id)}
+                  onClick={(e) => {
+                    if (notification.type === "call_invite") {
+                      handleCallInviteClick(notification, e)
+                      markAsRead(notification.id)
+                    } else {
+                      markAsRead(notification.id)
+                    }
+                  }}
                 >
                   <div className="flex">
                     <div className="flex-shrink-0 mr-3">
+                      {(() => {
+                        // Get imageUrl from notification or metadata
+                        const imageUrl = notification.imageUrl || notification.metadata?.patientPhotoURL || notification.metadata?.doctorPhotoURL
+                        return imageUrl ? (
+                          // Display user profile image if available
+                          <img
+                            src={imageUrl}
+                            alt={notification.title || "User"}
+                            className="h-10 w-10 rounded-full object-cover border-2 border-soft-amber/30"
+                            onError={(e) => {
+                              // Fallback to icon if image fails to load
+                              e.target.style.display = "none"
+                              const iconDiv = e.target.nextElementSibling
+                              if (iconDiv) {
+                                iconDiv.style.display = "block"
+                              }
+                            }}
+                          />
+                        ) : null
+                      })()}
                       <div
-                        className={`rounded-full p-2 ${
+                        className={`rounded-full ${
+                          (notification.imageUrl || notification.metadata?.patientPhotoURL || notification.metadata?.doctorPhotoURL) ? "hidden" : "p-2"
+                        } ${
                           notification.type === "appointment"
                             ? "bg-soft-amber/20"
                             : notification.type === "message"

@@ -21,7 +21,7 @@ export function SignaturePad({ onChange, initialSignature = null }) {
     const resizeCanvas = () => {
       const rect = canvas.parentNode.getBoundingClientRect()
       canvas.width = rect.width
-      canvas.height = 150
+      canvas.height = 200
 
       // Clear and redraw if we have an initial signature
       if (initialSignature) {
