@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation"
 import { X, ChevronLeft, ChevronRight, Clock, SettingsIcon } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { LogoutConfirmation } from "@/components/logout-confirmation"
-import { Logo } from "@/components/logo"
 
 // Import icons
 import {
@@ -22,6 +21,7 @@ import {
   LogOut,
   TrendingUp,
   User,
+  Globe2,
 } from "lucide-react"
 
 export default function AdminSidebar({ isOpen = true, onClose, isMobile = false, collapsed = false, onCollapse }) {
@@ -84,6 +84,11 @@ export default function AdminSidebar({ isOpen = true, onClose, isMobile = false,
       title: "Roles",
       icon: <Shield className="h-4 w-4" />,
       href: "/admin/roles",
+    },
+    {
+      title: "Brand Settings",
+      icon: <Globe2 className="h-4 w-4" />,
+      href: "/admin/welcome-editor",
     },
     {
       title: "Settings",
@@ -153,12 +158,15 @@ export default function AdminSidebar({ isOpen = true, onClose, isMobile = false,
   // Update the sidebar class to be fixed and non-scrollable
   // Replace the sidebarClass with this updated version
   const sidebarClass = `
-    fixed inset-y-0 left-0 bg-white shadow-lg z-40
+    fixed inset-y-0 left-0 z-40
     transition-all duration-300 ease-in-out
     ${isMobile ? "z-50" : "z-30"}
     ${isMobile && !isOpen ? "-translate-x-full" : "translate-x-0"}
-    ${isCollapsed ? "w-16" : "w-56"}
-    flex flex-col
+    ${isCollapsed ? "w-16" : "w-60"}
+    flex flex-col border-r border-earth-beige/60
+    bg-gradient-to-b from-amber-50 via-white to-cream
+    shadow-[8px_0_24px_-12px_rgba(0,0,0,0.15)]
+    backdrop-blur-sm
   `
 
   // Backdrop with enhanced animation
@@ -184,12 +192,16 @@ export default function AdminSidebar({ isOpen = true, onClose, isMobile = false,
         {/* Update the sidebar header to be more compact
         // Replace the sidebar header with this updated version */}
         {!isCollapsed && (
-          <div className="h-14 flex items-center justify-between px-3 border-b border-earth-beige">
-            <Logo href="/admin/dashboard" showBadge={true} badgeText="Admin" className="scale-90" />
+          <div className="h-14 flex items-center justify-between px-3 border-b border-earth-beige/70 bg-white/70 backdrop-blur-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+                Control Panel
+              </span>
+            </div>
             {isMobile && (
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-full hover:bg-pale-stone transition-colors duration-200"
+                className="p-1.5 rounded-full hover:bg-amber-50 transition-colors duration-200"
               >
                 <X className="h-4 w-4 text-graphite" />
               </button>
@@ -200,9 +212,9 @@ export default function AdminSidebar({ isOpen = true, onClose, isMobile = false,
         {/* Update the user info section to be more compact
         // Replace the user info section with this updated version */}
         {!isCollapsed && (
-          <div className="p-3 border-b border-earth-beige">
+          <div className="p-3 border-b border-earth-beige/70 bg-white/60">
             <div
-              className="flex items-center cursor-pointer hover:bg-pale-stone/50 p-1.5 rounded-lg transition-colors duration-200"
+              className="flex items-center cursor-pointer hover:bg-amber-50/80 p-1.5 rounded-lg transition-colors duration-200"
               onClick={() => setShowUserDetails(!showUserDetails)}
             >
               <div className="h-8 w-8 rounded-full bg-soft-amber/20 flex items-center justify-center text-soft-amber mr-2 overflow-hidden">
@@ -219,8 +231,12 @@ export default function AdminSidebar({ isOpen = true, onClose, isMobile = false,
                 )}
               </div>
               <div className="flex-1">
-                <p className="font-medium text-xs text-graphite">{displayName}</p>
-                <p className="text-xs text-drift-gray truncate max-w-[120px]">{email}</p>
+                <p className="font-semibold text-xs text-graphite">{displayName}</p>
+                <p className="text-[11px] text-drift-gray truncate max-w-[140px]">{email}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-[10px] text-green-600">Online</span>
+                </div>
               </div>
               <div className="text-drift-gray">
                 <ChevronRight
@@ -260,20 +276,36 @@ export default function AdminSidebar({ isOpen = true, onClose, isMobile = false,
 
         // Replace the Navigation section with this updated version */}
         {/* Navigation */}
-        <nav className={`p-2 ${isCollapsed ? "h-auto" : "h-auto"}`}>
+        <nav
+          className={`p-2 ${isCollapsed ? "h-auto" : "h-auto"} ${
+            isMobile ? "max-h-[calc(100vh-200px)] overflow-y-auto pr-1" : ""
+          }`}
+        >
           <ul className="space-y-0.5">
             {navItems.map((item) => (
               <li key={item.title} className="relative">
                 <Link
                   href={item.href}
-                  className={`flex items-center px-2 py-1.5 rounded-md transition-colors duration-200 ${
-                    isActive(item.href) ? "bg-soft-amber/10 text-soft-amber" : "text-drift-gray hover:bg-pale-stone"
+                  className={`group relative flex items-center px-2 py-2 rounded-md transition-all duration-200 ${
+                    isActive(item.href)
+                      ? "bg-amber-50 text-amber-700 shadow-sm border border-amber-100"
+                      : "text-drift-gray hover:bg-amber-50/60 hover:text-amber-700 border border-transparent"
                   } ${isCollapsed ? "justify-center" : ""}`}
                   onMouseEnter={() => setHoveredItem(item.title)}
                   onMouseLeave={() => setHoveredItem(null)}
+                  style={{ transformOrigin: "left center" }}
                 >
-                  {item.icon}
-                  {!isCollapsed && <span className="ml-2 text-sm">{item.title}</span>}
+                  <span
+                    className={`absolute left-0 top-1/2 -translate-y-1/2 h-6 w-0.5 rounded-full transition-all duration-200 ${
+                      isActive(item.href) ? "bg-amber-500" : "bg-transparent group-hover:bg-amber-300"
+                    }`}
+                  />
+                  <span
+                    className={`flex items-center gap-2 ${isCollapsed ? "justify-center" : "pl-1"} group-hover:translate-x-1 transition-transform duration-200 active:scale-[0.98]`}
+                  >
+                    {item.icon}
+                    {!isCollapsed && <span className="text-sm font-medium">{item.title}</span>}
+                  </span>
                 </Link>
 
                 {/* Tooltip for collapsed sidebar */}
@@ -334,6 +366,13 @@ export default function AdminSidebar({ isOpen = true, onClose, isMobile = false,
               </div>
             )}
           </button>
+
+          {!isCollapsed && (
+            <div className="mt-3 text-[10px] text-drift-gray/80 flex items-center justify-between">
+              <span className="uppercase tracking-wide">SmartCare</span>
+              <span className="text-amber-700 font-semibold">v2.0</span>
+            </div>
+          )}
         </div>
       </aside>
 

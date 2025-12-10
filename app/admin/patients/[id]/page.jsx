@@ -889,13 +889,13 @@ export default function AdminPatientDetailsPage() {
         stats={headerStats}
       />
       <div className="flex justify-between items-center">
-        <button
-          onClick={handleBackToPatients}
+          <button
+            onClick={handleBackToPatients}
           className="inline-flex items-center rounded-md bg-earth-beige px-3 py-2 text-sm font-medium text-graphite transition-colors hover:bg-earth-beige/80"
-        >
-          <ArrowLeft className="mr-1 h-4 w-4" />
-          Back to Patients
-        </button>
+          >
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Back to Patients
+          </button>
         <div className="flex items-center bg-white rounded-md px-3 py-1.5 border border-earth-beige">
           <Shield className="h-4 w-4 text-soft-amber mr-2" />
           <span className="text-xs font-medium text-graphite">Admin View</span>
@@ -976,67 +976,67 @@ export default function AdminPatientDetailsPage() {
 
             {/* Desktop pills */}
             <div className="hidden sm:flex justify-center overflow-x-auto">
-              <div className="flex p-1 bg-earth-beige/20 rounded-full shadow-sm">
-                <button
-                  onClick={() => setActiveTab("profile")}
-                  className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
-                    activeTab === "profile" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
-                  }`}
-                >
-                  <span className="relative z-10 flex items-center">
-                    <User className="h-4 w-4 mr-1.5" />
-                    Profile
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab("appointments")
-                    logAccessAttempt("appointments")
-                  }}
-                  className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
-                    activeTab === "appointments"
-                      ? "bg-soft-amber text-white shadow-sm"
-                      : "text-drift-gray hover:text-graphite"
-                  }`}
-                >
-                  <span className="relative z-10 flex items-center">
-                    <CalendarDays className="h-4 w-4 mr-1.5" />
-                    Appointments
-                    {accessStatus.appointments !== "granted" && <Lock className="h-3 w-3 ml-1 text-gray-400" />}
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab("records")
-                    logAccessAttempt("records")
-                  }}
-                  className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
-                    activeTab === "records" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
-                  }`}
-                >
-                  <span className="relative z-10 flex items-center">
-                    <FileIcon className="h-4 w-4 mr-1.5" />
-                    Health Records
-                    {accessStatus.records !== "granted" && <Lock className="h-3 w-3 ml-1 text-gray-400" />}
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab("prescriptions")
-                    logAccessAttempt("prescriptions")
-                  }}
-                  className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
-                    activeTab === "prescriptions"
-                      ? "bg-soft-amber text-white shadow-sm"
-                      : "text-drift-gray hover:text-graphite"
-                  }`}
-                >
-                  <span className="relative z-10 flex items-center">
-                    <Pill className="h-4 w-4 mr-1.5" />
-                    Prescriptions
-                    {accessStatus.prescriptions !== "granted" && <Lock className="h-3 w-3 ml-1 text-gray-400" />}
-                  </span>
-                </button>
+            <div className="flex p-1 bg-earth-beige/20 rounded-full shadow-sm">
+              <button
+                onClick={() => setActiveTab("profile")}
+                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                  activeTab === "profile" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
+                }`}
+              >
+                <span className="relative z-10 flex items-center">
+                  <User className="h-4 w-4 mr-1.5" />
+                  Profile
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("appointments")
+                  logAccessAttempt("appointments")
+                }}
+                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                  activeTab === "appointments"
+                    ? "bg-soft-amber text-white shadow-sm"
+                    : "text-drift-gray hover:text-graphite"
+                }`}
+              >
+                <span className="relative z-10 flex items-center">
+                  <CalendarDays className="h-4 w-4 mr-1.5" />
+                  Appointments
+                  {accessStatus.appointments !== "granted" && <Lock className="h-3 w-3 ml-1 text-gray-400" />}
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("records")
+                  logAccessAttempt("records")
+                }}
+                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                  activeTab === "records" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
+                }`}
+              >
+                <span className="relative z-10 flex items-center">
+                  <FileIcon className="h-4 w-4 mr-1.5" />
+                  Health Records
+                  {accessStatus.records !== "granted" && <Lock className="h-3 w-3 ml-1 text-gray-400" />}
+                </span>
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab("prescriptions")
+                  logAccessAttempt("prescriptions")
+                }}
+                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                  activeTab === "prescriptions"
+                    ? "bg-soft-amber text-white shadow-sm"
+                    : "text-drift-gray hover:text-graphite"
+                }`}
+              >
+                <span className="relative z-10 flex items-center">
+                  <Pill className="h-4 w-4 mr-1.5" />
+                  Prescriptions
+                  {accessStatus.prescriptions !== "granted" && <Lock className="h-3 w-3 ml-1 text-gray-400" />}
+                </span>
+              </button>
               </div>
             </div>
           </div>

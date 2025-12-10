@@ -35,7 +35,7 @@ export default function ReportsPage() {
     async function loadStats() {
       try {
         setIsLoading(true)
-        
+
         const collections = [
           "users",
           "appointments",
@@ -178,7 +178,7 @@ export default function ReportsPage() {
     },
   ]
 
-  return (
+        return (
     <div className="w-full">
       <AdminHeaderBanner
         title="Database Backup"
@@ -191,7 +191,7 @@ export default function ReportsPage() {
         {/* Backup Section */}
         <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
-            <div>
+                    <div>
               <h2 className="text-xl font-semibold text-graphite mb-2 flex items-center">
                 <Database className="h-6 w-6 mr-2 text-amber-600" />
                 Database Backup
@@ -241,9 +241,9 @@ export default function ReportsPage() {
                 <p className="text-sm text-green-800 font-medium">
                   Database backup downloaded successfully!
                 </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Backup Button */}
           <div className="flex flex-col sm:flex-row gap-4">
@@ -292,7 +292,7 @@ export default function ReportsPage() {
                 <div key={i} className="animate-pulse">
                   <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
                   <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                </div>
+            </div>
               ))}
             </div>
           ) : (

@@ -11,6 +11,7 @@ export function Logo({ href = "/", className = "", showBadge = false, badgeText 
     fontSize: "text-xl",
     fontWeight: "font-bold",
     imageUrl: "",
+    imageHeight: 32,
   })
   const [isLoading, setIsLoading] = useState(true)
 
@@ -35,12 +36,12 @@ export function Logo({ href = "/", className = "", showBadge = false, badgeText 
     <Link href={href} className={`flex items-center ${className}`}>
       {/* Logo Image (if available) */}
       {!isLoading && logoContent.imageUrl && (
-        <div className="h-8 relative mr-2">
+        <div className="relative mr-2" style={{ height: `${logoContent.imageHeight || 32}px` }}>
           <img
             src={logoContent.imageUrl || "/placeholder.svg"}
             alt="SmartCare Logo"
             className="h-full w-auto object-contain"
-            style={{ maxHeight: "32px" }}
+            style={{ maxHeight: `${logoContent.imageHeight || 32}px` }}
           />
         </div>
       )}

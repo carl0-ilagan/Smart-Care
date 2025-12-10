@@ -6,11 +6,12 @@ import { useMobile } from "@/hooks/use-mobile"
 import { useAuth } from "@/contexts/auth-context"
 import { addFeedback, getUserFeedback, deleteFeedback, getAllDoctors } from "@/lib/feedback-utils"
 import { SuccessNotification } from "@/components/success-notification"
-import { X, Check } from "lucide-react"
+import { X, Check, Loader2 } from "lucide-react"
 import { getDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import ProfileImage from "@/components/profile-image"
 import { DashboardHeaderBanner } from "@/components/dashboard-header-banner"
+import { analyzeSentiment, getSentimentStyle } from "@/lib/sentiment-analysis"
 
 export default function PatientFeedbackPage() {
   const isMobile = useMobile()
@@ -28,6 +29,8 @@ export default function PatientFeedbackPage() {
   const [loadingDoctors, setLoadingDoctors] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [adminProfiles, setAdminProfiles] = useState({})
+  const [sentimentAnalyses, setSentimentAnalyses] = useState({})
+  const [analyzingSentiments, setAnalyzingSentiments] = useState({})
 
   // Load user feedback
   useEffect(() => {
@@ -250,6 +253,30 @@ export default function PatientFeedbackPage() {
       return adminProfiles[adminId].displayName
     }
     return "Admin"
+  }
+
+  // Analyze sentiment for a feedback item
+  const handleAnalyzeSentiment = async (feedbackId, message) => {
+    if (!message || message.trim().length === 0) return
+    
+    if (sentimentAnalyses[feedbackId]) {
+      // Already analyzed, toggle visibility or skip
+      return
+    }
+
+    setAnalyzingSentiments((prev) => ({ ...prev, [feedbackId]: true }))
+    try {
+      const sentiment = await analyzeSentiment(message)
+      setSentimentAnalyses((prev) => ({ ...prev, [feedbackId]: sentiment }))
+    } catch (error) {
+      console.error("Error analyzing sentiment:", error)
+    } finally {
+      setAnalyzingSentiments((prev) => {
+        const updated = { ...prev }
+        delete updated[feedbackId]
+        return updated
+      })
+    }
   }
 
   return (
@@ -485,6 +512,43 @@ export default function PatientFeedbackPage() {
                       </div>
                     </div>
                     <p className="text-sm text-graphite mb-2">{feedback.message}</p>
+
+                    {/* Sentiment Analysis */}
+                    {feedback.message && feedback.message.trim().length > 0 && (
+                      <div className="mb-2">
+                        {sentimentAnalyses[feedback.id] ? (
+                          <div className="bg-gray-50 rounded-lg p-2 border border-earth-beige">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm">{getSentimentStyle(sentimentAnalyses[feedback.id].sentiment).icon}</span>
+                              <span className={`text-xs font-medium px-2 py-1 rounded-full ${getSentimentStyle(sentimentAnalyses[feedback.id].sentiment).bgColor} ${getSentimentStyle(sentimentAnalyses[feedback.id].sentiment).color}`}>
+                                {getSentimentStyle(sentimentAnalyses[feedback.id].sentiment).label}
+                              </span>
+                              <span className="text-xs text-graphite">
+                                Score: {(sentimentAnalyses[feedback.id].score * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            {sentimentAnalyses[feedback.id].summary && (
+                              <p className="text-xs text-graphite italic">{sentimentAnalyses[feedback.id].summary}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleAnalyzeSentiment(feedback.id, feedback.message)}
+                            disabled={analyzingSentiments[feedback.id]}
+                            className="text-xs text-soft-amber hover:text-amber-600 flex items-center gap-1"
+                          >
+                            {analyzingSentiments[feedback.id] ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin" />
+                                Analyzing...
+                              </>
+                            ) : (
+                              "Analyze Sentiment"
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {feedback.status === "responded" && feedback.response && (
                       <div className="mt-2 pl-3 border-l-2 border-soft-amber">

@@ -618,7 +618,7 @@ export default function SettingsPage() {
               }`}
             >
               {errorFilterOptions.map((option) => (
-                <button
+              <button
                   key={option.value}
                   onClick={() => {
                     setErrorFilter(option.value)
@@ -626,11 +626,11 @@ export default function SettingsPage() {
                   }}
                   className={`block w-full px-3 py-2 text-left text-xs capitalize transition-colors ${
                     errorFilter === option.value ? "bg-amber-50 text-amber-700" : "hover:bg-cream"
-                  }`}
-                >
+                }`}
+              >
                   {option.label}
-                </button>
-              ))}
+              </button>
+            ))}
             </div>
           </div>
         </div>

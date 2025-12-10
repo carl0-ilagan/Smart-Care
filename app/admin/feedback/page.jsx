@@ -8,6 +8,7 @@ import { getAllFeedback, respondToFeedback } from "@/lib/feedback-utils"
 import { useAuth } from "@/contexts/auth-context"
 import { getDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { analyzeSentiment, getSentimentStyle } from "@/lib/sentiment-analysis"
 
 export default function AdminFeedbackPage() {
   const { user } = useAuth()
@@ -24,6 +25,8 @@ export default function AdminFeedbackPage() {
   const [lastDoc, setLastDoc] = useState(null)
   const [hasMore, setHasMore] = useState(false)
   const [adminProfiles, setAdminProfiles] = useState({})
+  const [sentimentAnalysis, setSentimentAnalysis] = useState(null)
+  const [analyzingSentiment, setAnalyzingSentiment] = useState(false)
 
   const loadFeedback = async (reset = false) => {
     try {
@@ -125,9 +128,23 @@ export default function AdminFeedbackPage() {
     })
   }, [feedback, search, statusFilter, typeFilter])
 
-  const handleSelect = (item) => {
+  const handleSelect = async (item) => {
     setSelected(item)
     setResponseText(item.response || "")
+    setSentimentAnalysis(null)
+    
+    // Analyze sentiment when feedback is selected
+    if (item.message && item.message.trim().length > 0) {
+      setAnalyzingSentiment(true)
+      try {
+        const sentiment = await analyzeSentiment(item.message)
+        setSentimentAnalysis(sentiment)
+      } catch (error) {
+        console.error("Error analyzing sentiment:", error)
+      } finally {
+        setAnalyzingSentiment(false)
+      }
+    }
   }
 
   const handleRespond = async () => {
@@ -366,6 +383,96 @@ export default function AdminFeedbackPage() {
                     <p className="text-sm text-graphite">{selected.message || "No message provided."}</p>
                   </div>
                 </div>
+
+                {/* Sentiment Analysis - Enhanced Right Side Card */}
+                {selected.message && selected.message.trim().length > 0 && (
+                  <div className="rounded-lg bg-gradient-to-br from-amber-50 to-amber-100/50 p-4 border-2 border-amber-200 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-amber-500/20 flex items-center justify-center">
+                          <span className="text-amber-700 text-lg">📊</span>
+                        </div>
+                        <p className="text-sm font-bold text-deep-forest">Sentiment Analysis</p>
+                      </div>
+                      {analyzingSentiment && (
+                        <Loader2 size={16} className="animate-spin text-amber-600" />
+                      )}
+                    </div>
+                    {sentimentAnalysis && !analyzingSentiment ? (
+                      <div className="space-y-3">
+                        {/* Main Sentiment Display */}
+                        <div className="flex items-center justify-between bg-white/80 rounded-lg p-3 border border-amber-200">
+                          <div className="flex items-center gap-3">
+                            <div className={`h-12 w-12 rounded-full flex items-center justify-center text-2xl ${
+                              sentimentAnalysis.sentiment === "positive"
+                                ? "bg-green-100"
+                                : sentimentAnalysis.sentiment === "negative"
+                                ? "bg-red-100"
+                                : "bg-gray-100"
+                            }`}>
+                              {getSentimentStyle(sentimentAnalysis.sentiment).icon}
+                            </div>
+                            <div>
+                              <p className={`text-sm font-bold ${
+                                sentimentAnalysis.sentiment === "positive"
+                                  ? "text-green-700"
+                                  : sentimentAnalysis.sentiment === "negative"
+                                  ? "text-red-700"
+                                  : "text-gray-700"
+                              }`}>
+                                {getSentimentStyle(sentimentAnalysis.sentiment).label}
+                              </p>
+                              <p className="text-xs text-graphite">
+                                Score: <span className="font-semibold text-amber-700">{(sentimentAnalysis.score * 100).toFixed(0)}%</span>
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Confidence & Summary */}
+                        <div className="space-y-2">
+                          {sentimentAnalysis.confidence > 0 && (
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-graphite">Confidence Level:</span>
+                              <span className="font-semibold text-amber-700">{(sentimentAnalysis.confidence * 100).toFixed(0)}%</span>
+                            </div>
+                          )}
+                          {sentimentAnalysis.summary && (
+                            <div className="bg-white/60 rounded-md p-2 border border-amber-200">
+                              <p className="text-xs text-graphite italic leading-relaxed">{sentimentAnalysis.summary}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Enhanced Sentiment Score Bar */}
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-graphite">Sentiment Intensity</span>
+                            <span className="font-semibold text-amber-700">{Math.abs(sentimentAnalysis.score * 100).toFixed(0)}%</span>
+                          </div>
+                          <div className="w-full bg-amber-200/50 rounded-full h-3 overflow-hidden border border-amber-300">
+                            <div
+                              className={`h-3 rounded-full transition-all duration-500 ease-out ${
+                                sentimentAnalysis.sentiment === "positive"
+                                  ? "bg-gradient-to-r from-green-400 to-green-600"
+                                  : sentimentAnalysis.sentiment === "negative"
+                                  ? "bg-gradient-to-r from-red-400 to-red-600"
+                                  : "bg-gradient-to-r from-gray-400 to-gray-600"
+                              }`}
+                              style={{
+                                width: `${Math.abs(sentimentAnalysis.score) * 100}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : !analyzingSentiment ? (
+                      <div className="text-center py-4">
+                        <p className="text-xs text-drift-gray">Analyzing sentiment...</p>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
 
                 {selected.status === "responded" && selected.response && (
                   <div className="rounded-lg bg-white p-3 text-sm text-deep-forest">

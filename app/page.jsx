@@ -10,7 +10,7 @@ import { LoginModal } from "@/components/login-modal"
 import { SignupModal } from "@/components/signup-modal"
 
 // Contact Form Component
-function ContactForm() {
+function ContactForm({ contactEmail = "contact@smartcare.com", brandName = "Smart Care" }) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -74,12 +74,12 @@ function ContactForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          to: "contact@smartcare.com",
-          subject: `Contact Form: ${formData.subject}`,
+          to: contactEmail,
+          subject: `${brandName} Contact Form: ${formData.subject}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #d97706; border-bottom: 2px solid #d97706; padding-bottom: 10px;">
-                New Contact Form Submission
+                New Contact Form Submission - ${brandName}
               </h2>
               <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
                 <p><strong>Name:</strong> ${formData.name}</p>
@@ -106,7 +106,7 @@ Message:
 ${formData.message}
 
 ---
-This message was sent from the Smart Care contact form.
+This message was sent from the ${brandName} contact form.
           `,
         }),
       })
@@ -271,7 +271,31 @@ export default function HomePage() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showSignupModal, setShowSignupModal] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const defaultBranding = {
+    name: "Smart Care",
+    tagline: "Your Health, One Click Away",
+    description:
+      "Connecting patients with healthcare professionals for virtual consultations, prescription management, and personalized care.",
+    logoUrl: "",
+    faviconUrl: "/SmartCare.png?v=2",
+    contact: {
+      address: "123 Healthcare Avenue, Medical District, CA 90210",
+      phone: "+1 (555) 123-4567",
+      email: "contact@smartcare.com",
+    },
+    footer: {
+      description:
+        "Smart Care connects patients with healthcare professionals for virtual consultations, prescription management, and personalized care.",
+      note: "All rights reserved.",
+      socials: {
+        facebook: "",
+        twitter: "",
+        instagram: "",
+      },
+    },
+  }
   const [landingContent, setLandingContent] = useState({
+    branding: defaultBranding,
     hero: {
       title: "Your Health, One Click Away",
       description:
@@ -333,7 +357,25 @@ export default function HomePage() {
       try {
         const content = await getLandingPageContent()
         if (content) {
-          setLandingContent(content)
+          setLandingContent({
+            ...content,
+            branding: {
+              ...defaultBranding,
+              ...(content.branding || {}),
+              contact: {
+                ...defaultBranding.contact,
+                ...(content.branding?.contact || {}),
+              },
+              footer: {
+                ...defaultBranding.footer,
+                ...(content.branding?.footer || {}),
+                socials: {
+                  ...defaultBranding.footer.socials,
+                  ...(content.branding?.footer?.socials || {}),
+                },
+              },
+            },
+          })
         }
       } catch (error) {
         console.error("Error loading landing page content:", error)
@@ -356,6 +398,30 @@ export default function HomePage() {
     }
   }, [mounted])
 
+  // Update page title and favicon based on branding
+  useEffect(() => {
+    const brandName = landingContent.branding?.name || "Smart Care"
+    const heroTitle = landingContent.hero?.title || "Your Health, One Click Away"
+    document.title = `${brandName} - ${heroTitle}`
+
+    const applyFavicon = (rel, href) => {
+      if (!href) return
+      let link = document.querySelector(`link[rel='${rel}']`)
+      if (!link) {
+        link = document.createElement("link")
+        link.setAttribute("rel", rel)
+        document.head.appendChild(link)
+      }
+      link.setAttribute("href", href)
+      link.setAttribute("type", "image/png")
+    }
+
+    const favicon = landingContent.branding?.faviconUrl
+    applyFavicon("icon", favicon)
+    applyFavicon("shortcut icon", favicon)
+    applyFavicon("apple-touch-icon", favicon)
+  }, [landingContent.branding, landingContent.hero?.title])
+
   // Map icon names to components
   const getIconComponent = (iconName, className) => {
     const icons = {
@@ -368,6 +434,14 @@ export default function HomePage() {
 
     return icons[iconName] || <MessageSquare className={className} />
   }
+
+  const brandName = landingContent.branding?.name || "Smart Care"
+  const brandTagline = landingContent.branding?.tagline || "Your Health, One Click Away"
+  const brandContact = landingContent.branding?.contact || {}
+  const contactEmail = brandContact.email || "contact@smartcare.com"
+  const contactPhone = brandContact.phone || "+1 (555) 123-4567"
+  const contactAddress = brandContact.address || "123 Healthcare Avenue, Medical District, CA 90210"
+  const phoneHref = contactPhone ? contactPhone.replace(/[^+\d]/g, "") : ""
 
   const testimonials = [
     {
@@ -444,7 +518,7 @@ export default function HomePage() {
           <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 lg:gap-12 items-center">
             <div className="flex flex-col justify-center space-y-3 animate-fadeInUp">
               <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-amber-500/10 border border-amber-500/20 w-fit mb-1">
-                <span className="text-xs sm:text-sm font-semibold text-amber-600">✨ Trusted by 10,000+ Users</span>
+                <span className="text-xs sm:text-sm font-semibold text-amber-600">✨ {brandTagline}</span>
               </div>
               <h1 className="text-3xl sm:text-4xl md:text-5xl xl:text-6xl font-bold tracking-tight text-graphite leading-tight">
                 {landingContent.hero.title}
@@ -475,7 +549,7 @@ export default function HomePage() {
                   <div className="absolute -inset-4 bg-gradient-to-r from-amber-500/20 to-amber-400/20 rounded-3xl blur-xl animate-pulse delay-500"></div>
               <img
                 src={landingContent.hero.imageUrl || "/placeholder.svg"}
-                alt="Smart Care Platform"
+                alt={`${brandName} Platform`}
                     className="relative aspect-video overflow-hidden rounded-2xl object-cover object-center shadow-2xl transform hover:scale-105 transition-transform duration-500"
                 width={600}
                 height={400}
@@ -709,11 +783,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-graphite mb-2 group-hover:text-amber-600 transition-colors">Our Location</h3>
-                    <p className="text-drift-gray leading-relaxed">
-                      123 Healthcare Avenue<br />
-                      Medical District, CA 90210<br />
-                      United States
-                    </p>
+                    <p className="text-drift-gray leading-relaxed break-words">{contactAddress}</p>
                   </div>
                 </div>
               </div>
@@ -725,8 +795,8 @@ export default function HomePage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-graphite mb-2 group-hover:text-amber-600 transition-colors">Phone Number</h3>
-                    <a href="tel:+15551234567" className="text-drift-gray hover:text-amber-600 transition-colors font-medium">
-                      +1 (555) 123-4567
+                    <a href={phoneHref ? `tel:${phoneHref}` : "#"} className="text-drift-gray hover:text-amber-600 transition-colors font-medium">
+                      {contactPhone}
                     </a>
                     <p className="text-sm text-drift-gray mt-1">Mon-Fri: 9AM - 6PM EST</p>
                   </div>
@@ -740,8 +810,8 @@ export default function HomePage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-graphite mb-2 group-hover:text-amber-600 transition-colors">Email Address</h3>
-                    <a href="mailto:contact@smartcare.com" className="text-drift-gray hover:text-amber-600 transition-colors break-all font-medium">
-                      contact@smartcare.com
+                    <a href={`mailto:${contactEmail}`} className="text-drift-gray hover:text-amber-600 transition-colors break-all font-medium">
+                      {contactEmail}
                     </a>
                     <p className="text-sm text-drift-gray mt-1">We respond within 24 hours</p>
                   </div>
@@ -777,14 +847,14 @@ export default function HomePage() {
                     Fill out the form below and we'll get back to you within 24 hours.
                   </p>
                 </div>
-                <ContactForm />
+                <ContactForm contactEmail={contactEmail} brandName={brandName} />
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <Footer scrollToSection={scrollToSection} />
+      <Footer scrollToSection={scrollToSection} brand={landingContent.branding} />
     </div>
   )
 }

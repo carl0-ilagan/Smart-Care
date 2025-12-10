@@ -610,25 +610,25 @@ export default function AnalyticsPage() {
                 ) : feedbackCategories.length > 0 ? (
                   <div className="h-full">
                     <ResponsiveContainer width="100%" height="75%">
-                      <PieChart>
-                        <Pie
-                          data={feedbackCategories}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
+                    <PieChart>
+                      <Pie
+                        data={feedbackCategories}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
                           outerRadius="60%"
-                          fill="#8884d8"
-                          dataKey="count"
-                          nameKey="name"
-                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                        >
-                          {feedbackCategories.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+                        fill="#8884d8"
+                        dataKey="count"
+                        nameKey="name"
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      >
+                        {feedbackCategories.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
                     <div className="mt-2 flex flex-wrap justify-center gap-2 sm:gap-3">
                       {feedbackCategories.map((entry, index) => (
                         <div key={index} className="flex items-center gap-1 text-xs sm:text-sm">
@@ -708,35 +708,35 @@ export default function AnalyticsPage() {
                   <div className="overflow-x-auto -mx-4 sm:mx-0">
                     <div className="inline-block min-w-full align-middle px-4 sm:px-0">
                       <table className="min-w-full divide-y divide-earth-beige">
-                        <thead>
-                          <tr className="border-b border-earth-beige">
+                      <thead>
+                        <tr className="border-b border-earth-beige">
                             <th className="text-left py-3 px-2 sm:px-4 text-xs sm:text-sm font-medium text-graphite">Category</th>
                             <th className="text-center py-3 px-2 sm:px-4 text-xs sm:text-sm font-medium text-graphite">Count</th>
                             <th className="text-center py-3 px-2 sm:px-4 text-xs sm:text-sm font-medium text-graphite">Rating</th>
                             <th className="text-center py-3 px-2 sm:px-4 text-xs sm:text-sm font-medium text-graphite">%</th>
-                          </tr>
-                        </thead>
+                        </tr>
+                      </thead>
                         <tbody className="divide-y divide-earth-beige">
-                          {feedbackCategories.map((category, index) => {
-                            const totalCount = feedbackCategories.reduce((sum, cat) => sum + cat.count, 0)
-                            const percentage = ((category.count / totalCount) * 100).toFixed(1)
+                        {feedbackCategories.map((category, index) => {
+                          const totalCount = feedbackCategories.reduce((sum, cat) => sum + cat.count, 0)
+                          const percentage = ((category.count / totalCount) * 100).toFixed(1)
 
-                            return (
+                          return (
                               <tr key={index} className="hover:bg-pale-stone/50 transition-colors">
                                 <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-graphite whitespace-nowrap">{category.name}</td>
                                 <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-center text-graphite">{category.count}</td>
                                 <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-center">
-                                  <div className="flex items-center justify-center">
+                                <div className="flex items-center justify-center">
                                     <Star className="h-3 w-3 sm:h-4 sm:w-4 text-soft-amber mr-1" />
-                                    <span>{category.averageRating}</span>
-                                  </div>
-                                </td>
+                                  <span>{category.averageRating}</span>
+                                </div>
+                              </td>
                                 <td className="py-3 px-2 sm:px-4 text-xs sm:text-sm text-center text-graphite">{percentage}%</td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
                     </div>
                   </div>
                 ) : (

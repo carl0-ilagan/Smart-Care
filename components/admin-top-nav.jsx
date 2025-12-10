@@ -164,12 +164,12 @@ export function AdminTopNav({ onMenuClick, sidebarCollapsed }) {
           scrollbar-width: none;
         }
       `}</style>
-      <header
-        className={`
+    <header
+      className={`
   sticky top-0 z-20 bg-white shadow-sm w-full
   transition-all duration-300 ease-in-out mb-0
 `}
-      >
+    >
       <div className="px-4 py-3 flex items-center justify-between">
         {/* Left side - Menu button (mobile) and Logo - SmartCare - Role */}
         <div className="flex items-center">
@@ -219,9 +219,9 @@ export function AdminTopNav({ onMenuClick, sidebarCollapsed }) {
                   className="text-xs text-amber-600 hover:text-amber-700 hover:underline font-medium"
                   onClick={() => setShowNotifications(false)}
                 >
-                  View All
-                </Link>
-              </div>
+                    View All
+                  </Link>
+                </div>
               <div className="max-h-96 overflow-y-auto notification-dropdown-scroll">
                 {isLoadingNotifications ? (
                   <div className="px-4 py-8 text-center">
@@ -282,8 +282,8 @@ export function AdminTopNav({ onMenuClick, sidebarCollapsed }) {
                     </div>
                   ))
                 )}
+                </div>
               </div>
-            </div>
           </div>
         </div>
       </div>

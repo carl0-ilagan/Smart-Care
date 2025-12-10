@@ -9,6 +9,8 @@ import { SuccessNotification } from "@/components/success-notification"
 import { getDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import ProfileImage from "@/components/profile-image"
+import { analyzeSentiment, getSentimentStyle } from "@/lib/sentiment-analysis"
+import { Loader2 } from "lucide-react"
 
 export default function DoctorFeedbackPage() {
   const isMobile = useMobile()
@@ -23,6 +25,8 @@ export default function DoctorFeedbackPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [adminProfiles, setAdminProfiles] = useState({})
+  const [sentimentAnalyses, setSentimentAnalyses] = useState({})
+  const [analyzingSentiments, setAnalyzingSentiments] = useState({})
 
   // Load user feedback
   useEffect(() => {
@@ -43,30 +47,28 @@ export default function DoctorFeedbackPage() {
         const adminProfilesData = {}
         for (const adminId of adminIds) {
           try {
-            // First try to get from admins collection
+            // Try users collection first to minimize permission issues
+            const userDoc = await getDoc(doc(db, "users", adminId))
+            if (userDoc.exists() && userDoc.data().role === "admin") {
+              adminProfilesData[adminId] = userDoc.data()
+              continue
+            }
+
+            // Fallback to admins collection; may be restricted for doctors, so handle permission errors quietly
             const adminDoc = await getDoc(doc(db, "admins", adminId))
-
             if (adminDoc.exists()) {
-              console.log(`Admin profile found for ${adminId}:`, adminDoc.data())
               adminProfilesData[adminId] = adminDoc.data()
-            } else {
-              // If not found in admins collection, try users collection with admin role
-              console.log(`Admin not found in admins collection, trying users collection for ${adminId}`)
-              const userDoc = await getDoc(doc(db, "users", adminId))
-
-              if (userDoc.exists() && userDoc.data().role === "admin") {
-                console.log(`Admin found in users collection for ${adminId}:`, userDoc.data())
-                adminProfilesData[adminId] = userDoc.data()
-              } else {
-                console.log(`No admin profile found for ${adminId} in either collection`)
-              }
             }
           } catch (error) {
-            console.error(`Error fetching admin ${adminId}:`, error)
+            if (error?.code === "permission-denied") {
+              // Provide a minimal placeholder to avoid breaking UI when permissions are restricted
+              adminProfilesData[adminId] = { displayName: "Admin", photoURL: "/admin-interface.png" }
+            } else {
+              console.error(`Error fetching admin ${adminId}:`, error)
+            }
           }
         }
 
-        console.log("Fetched admin profiles:", adminProfilesData)
         setAdminProfiles(adminProfilesData)
       } catch (error) {
         console.error("Error loading feedback:", error)
@@ -208,6 +210,30 @@ export default function DoctorFeedbackPage() {
       return adminProfiles[adminId].displayName
     }
     return "Admin"
+  }
+
+  // Analyze sentiment for a feedback item
+  const handleAnalyzeSentiment = async (feedbackId, message) => {
+    if (!message || message.trim().length === 0) return
+    
+    if (sentimentAnalyses[feedbackId]) {
+      // Already analyzed, toggle visibility or skip
+      return
+    }
+
+    setAnalyzingSentiments((prev) => ({ ...prev, [feedbackId]: true }))
+    try {
+      const sentiment = await analyzeSentiment(message)
+      setSentimentAnalyses((prev) => ({ ...prev, [feedbackId]: sentiment }))
+    } catch (error) {
+      console.error("Error analyzing sentiment:", error)
+    } finally {
+      setAnalyzingSentiments((prev) => {
+        const updated = { ...prev }
+        delete updated[feedbackId]
+        return updated
+      })
+    }
   }
 
   return (
@@ -419,6 +445,43 @@ export default function DoctorFeedbackPage() {
                       </div>
                     </div>
                     <p className="text-sm text-graphite mb-2">{feedback.message}</p>
+
+                    {/* Sentiment Analysis */}
+                    {feedback.message && feedback.message.trim().length > 0 && (
+                      <div className="mb-2">
+                        {sentimentAnalyses[feedback.id] ? (
+                          <div className="bg-gray-50 rounded-lg p-2 border border-earth-beige">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm">{getSentimentStyle(sentimentAnalyses[feedback.id].sentiment).icon}</span>
+                              <span className={`text-xs font-medium px-2 py-1 rounded-full ${getSentimentStyle(sentimentAnalyses[feedback.id].sentiment).bgColor} ${getSentimentStyle(sentimentAnalyses[feedback.id].sentiment).color}`}>
+                                {getSentimentStyle(sentimentAnalyses[feedback.id].sentiment).label}
+                              </span>
+                              <span className="text-xs text-graphite">
+                                Score: {(sentimentAnalyses[feedback.id].score * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            {sentimentAnalyses[feedback.id].summary && (
+                              <p className="text-xs text-graphite italic">{sentimentAnalyses[feedback.id].summary}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleAnalyzeSentiment(feedback.id, feedback.message)}
+                            disabled={analyzingSentiments[feedback.id]}
+                            className="text-xs text-soft-amber hover:text-amber-600 flex items-center gap-1"
+                          >
+                            {analyzingSentiments[feedback.id] ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin" />
+                                Analyzing...
+                              </>
+                            ) : (
+                              "Analyze Sentiment"
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {feedback.status === "responded" && feedback.response && (
                       <div className="mt-2 pl-3 border-l-2 border-soft-amber">

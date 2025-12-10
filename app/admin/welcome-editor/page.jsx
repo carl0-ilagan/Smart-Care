@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   Trash2,
@@ -13,6 +13,7 @@ import {
   Layout,
   MessageSquare,
   AlertCircle,
+  Globe2,
 } from "lucide-react"
 import { AdminHeaderBanner } from "@/components/admin-header-banner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -20,10 +21,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { SuccessNotification } from "@/components/success-notification"
 import {
-  getWelcomeContent,
-  updateWelcomeContent,
-  uploadWelcomeImage,
-  deleteWelcomeImage,
   getLandingPageContent,
   updateLandingPageContent,
   uploadLandingPageImage,
@@ -38,31 +35,36 @@ export default function WelcomeEditorPage() {
   const router = useRouter()
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState("landing")
+  const [mobileTabsOpen, setMobileTabsOpen] = useState(false)
+  const mobileTabsRef = useRef(null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [welcomeContent, setWelcomeContent] = useState({
-    patient: {
-      title: "Welcome to Smart Care",
-      description: "Your health is our priority. Access your medical records, appointments, and more.",
-      showOnLogin: true,
-      imageUrl: "",
-    },
-    doctor: {
-      title: "Welcome, Doctor",
-      description: "Manage your patients, appointments, and prescriptions efficiently.",
-      showOnLogin: true,
-      imageUrl: "",
-    },
-    admin: {
-      title: "Welcome, Admin",
-      description: "Manage the Smart Care platform and its users.",
-      showOnLogin: true,
-      imageUrl: "",
-    },
-  })
 
   const [landingContent, setLandingContent] = useState({
+    branding: {
+      name: "Smart Care",
+      tagline: "Your Health, One Click Away",
+      description:
+        "Connecting patients with healthcare professionals for virtual consultations, prescription management, and personalized care.",
+      logoUrl: "",
+      faviconUrl: "/SmartCare.png?v=2",
+      contact: {
+        address: "123 Healthcare Avenue, Medical District, CA 90210",
+        phone: "+1 (555) 123-4567",
+        email: "contact@smartcare.com",
+      },
+      footer: {
+        description:
+          "Smart Care connects patients with healthcare professionals for virtual consultations, prescription management, and personalized care.",
+        note: "All rights reserved.",
+        socials: {
+          facebook: "",
+          twitter: "",
+          instagram: "",
+        },
+      },
+    },
     hero: {
       title: "Your Health, One Click Away",
       description:
@@ -129,6 +131,7 @@ export default function WelcomeEditorPage() {
     fontSize: "text-xl",
     fontWeight: "font-bold",
     imageUrl: "",
+    imageHeight: 32,
   })
 
   // Check if user is authenticated
@@ -138,21 +141,43 @@ export default function WelcomeEditorPage() {
     }
   }, [user])
 
+  // Close mobile tab dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (mobileTabsRef.current && !mobileTabsRef.current.contains(e.target)) {
+        setMobileTabsOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
   // Load welcome content on mount
   useEffect(() => {
     const loadContent = async () => {
       try {
-        const welcomeData = await getWelcomeContent()
-        if (welcomeData) {
-          setWelcomeContent(welcomeData)
-          if (welcomeData.lastUpdated) {
-            setLastUpdated(welcomeData.lastUpdated)
-          }
-        }
-
         const landingData = await getLandingPageContent()
         if (landingData) {
-          setLandingContent(landingData)
+          setLandingContent((prev) => ({
+            ...prev,
+            ...landingData,
+            branding: {
+              ...prev.branding,
+              ...(landingData.branding || {}),
+              contact: {
+                ...prev.branding.contact,
+                ...(landingData.branding?.contact || {}),
+              },
+              footer: {
+                ...prev.branding.footer,
+                ...(landingData.branding?.footer || {}),
+                socials: {
+                  ...prev.branding.footer.socials,
+                  ...(landingData.branding?.footer?.socials || {}),
+                },
+              },
+            },
+          }))
           if (landingData.lastUpdated && (!lastUpdated || landingData.lastUpdated > lastUpdated)) {
             setLastUpdated(landingData.lastUpdated)
           }
@@ -170,17 +195,6 @@ export default function WelcomeEditorPage() {
 
     loadContent()
   }, [])
-
-  // Handle welcome content changes
-  const handleWelcomeChange = (userType, field, value) => {
-    setWelcomeContent((prev) => ({
-      ...prev,
-      [userType]: {
-        ...prev[userType],
-        [field]: value,
-      },
-    }))
-  }
 
   // Handle landing page content changes
   const handleLandingChange = (section, field, value) => {
@@ -223,6 +237,58 @@ export default function WelcomeEditorPage() {
     })
   }
 
+  const handleBrandingChange = (field, value) => {
+    setLandingContent((prev) => ({
+      ...prev,
+      branding: {
+        ...prev.branding,
+        [field]: value,
+      },
+    }))
+  }
+
+  const handleBrandingContactChange = (field, value) => {
+    setLandingContent((prev) => ({
+      ...prev,
+      branding: {
+        ...prev.branding,
+        contact: {
+          ...prev.branding.contact,
+          [field]: value,
+        },
+      },
+    }))
+  }
+
+  const handleBrandingFooterChange = (field, value) => {
+    setLandingContent((prev) => ({
+      ...prev,
+      branding: {
+        ...prev.branding,
+        footer: {
+          ...prev.branding.footer,
+          [field]: value,
+        },
+      },
+    }))
+  }
+
+  const handleBrandingSocialChange = (field, value) => {
+    setLandingContent((prev) => ({
+      ...prev,
+      branding: {
+        ...prev.branding,
+        footer: {
+          ...prev.branding.footer,
+          socials: {
+            ...prev.branding.footer.socials,
+            [field]: value,
+          },
+        },
+      },
+    }))
+  }
+
   // Handle logo content changes
   const handleLogoChange = (field, value) => {
     setLogoContent((prev) => ({
@@ -252,7 +318,7 @@ export default function WelcomeEditorPage() {
   }
 
   // Handle image upload
-  const handleImageUpload = async (e, section, isLanding = false) => {
+  const handleImageUpload = async (e, section) => {
     const file = e.target.files[0]
     if (!file) return
 
@@ -268,27 +334,14 @@ export default function WelcomeEditorPage() {
     })
 
     try {
-      let imageUrl
-
-      if (isLanding) {
-        imageUrl = await uploadLandingPageImage(file, section)
-        setLandingContent((prev) => ({
-          ...prev,
-          [section]: {
-            ...prev[section],
-            imageUrl,
-          },
-        }))
-      } else {
-        imageUrl = await uploadWelcomeImage(file, section)
-        setWelcomeContent((prev) => ({
-          ...prev,
-          [section]: {
-            ...prev[section],
-            imageUrl,
-          },
-        }))
-      }
+      const imageUrl = await uploadLandingPageImage(file, section)
+      setLandingContent((prev) => ({
+        ...prev,
+        [section]: {
+          ...prev[section],
+          imageUrl,
+        },
+      }))
 
       showNotification("Image uploaded successfully")
     } catch (error) {
@@ -302,25 +355,38 @@ export default function WelcomeEditorPage() {
     }
   }
 
-  // Handle image delete
-  const handleImageDelete = async (userType) => {
-    if (!welcomeContent[userType].imageUrl) return
+  const handleBrandingImageUpload = async (e, field) => {
+    const file = e.target.files[0]
+    if (!file) return
 
-    if (confirm("Are you sure you want to delete this image?")) {
-      try {
-        await deleteWelcomeImage(welcomeContent[userType].imageUrl)
-        setWelcomeContent((prev) => ({
-          ...prev,
-          [userType]: {
-            ...prev[userType],
-            imageUrl: "",
-          },
-        }))
-        showNotification("Image deleted successfully")
-      } catch (error) {
-        console.error("Error deleting image:", error)
-        showNotification("Failed to delete image: " + (error.message || "Unknown error"), true)
-      }
+    if (file.size > 1024 * 1024) {
+      showNotification("Image size exceeds 1MB limit. Please choose a smaller image.", true)
+      return
+    }
+
+    setUploadingImage({
+      section: field,
+      isUploading: true,
+    })
+
+    try {
+      const imageUrl = await uploadLandingPageImage(file, `branding-${field}`)
+      setLandingContent((prev) => ({
+        ...prev,
+        branding: {
+          ...prev.branding,
+          [field]: imageUrl,
+        },
+      }))
+      showNotification("Brand asset uploaded successfully")
+    } catch (error) {
+      console.error("Error uploading branding image:", error)
+      showNotification("Failed to upload brand asset: " + (error.message || "Unknown error"), true)
+    } finally {
+      setUploadingImage({
+        section: "",
+        isUploading: false,
+      })
     }
   }
 
@@ -383,14 +449,9 @@ export default function WelcomeEditorPage() {
 
     try {
       let result
-
-      if (activeTab === "landing") {
+      if (activeTab === "landing" || activeTab === "branding") {
         result = await updateLandingPageContent(landingContent)
-      } else {
-        result = await updateWelcomeContent(welcomeContent)
-      }
-
-      if (activeTab === "logo") {
+      } else if (activeTab === "logo") {
         result = await updateLogoContent(logoContent)
       }
 
@@ -539,19 +600,76 @@ export default function WelcomeEditorPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle>Content Editor</CardTitle>
-            <CardDescription>Edit website content and welcome messages for different user types</CardDescription>
+            <CardDescription>Edit landing content, branding, and logo assets</CardDescription>
           </CardHeader>
           <CardContent>
-            <TabsList className="grid w-full grid-cols-3 mb-6">
-              <TabsTrigger value="landing" className="data-[state=active]:bg-soft-amber data-[state=active]:text-white">
+            {/* Mobile tab selector with smooth dropdown */}
+            <div className="mb-4 md:hidden" ref={mobileTabsRef}>
+              <label className="block text-xs font-medium text-graphite mb-1">Select section</label>
+              <button
+                type="button"
+                onClick={() => setMobileTabsOpen((v) => !v)}
+                className="w-full rounded-md border border-earth-beige bg-white px-3 py-2 text-sm text-graphite flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-soft-amber transition-colors duration-200"
+              >
+                <span>
+                  {activeTab === "landing" ? "Landing Page" : activeTab === "branding" ? "Brand Settings" : "Logo Settings"}
+                </span>
+                <svg
+                  className={`h-4 w-4 text-drift-gray transition-transform duration-200 ${mobileTabsOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              <div
+                className={`mt-2 origin-top rounded-md border border-earth-beige bg-white shadow-lg transition-all duration-200 ease-out ${
+                  mobileTabsOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
+                }`}
+              >
+                {[
+                  { value: "landing", label: "Landing Page" },
+                  { value: "branding", label: "Brand Settings" },
+                  { value: "logo", label: "Logo Settings" },
+                ].map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(item.value)
+                      setMobileTabsOpen(false)
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors duration-150 ${
+                      activeTab === item.value ? "bg-amber-50 text-amber-700" : "text-graphite hover:bg-pale-stone"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <TabsList className="hidden md:grid w-full grid-cols-3 mb-6 bg-white border border-earth-beige/70 rounded-lg shadow-sm">
+              <TabsTrigger
+                value="landing"
+                className="data-[state=active]:bg-soft-amber data-[state=active]:text-white data-[state=active]:border-soft-amber data-[state=active]:shadow-sm text-graphite"
+              >
                 <Layout className="w-4 h-4 mr-2" />
                 Landing Page
               </TabsTrigger>
-              <TabsTrigger value="welcome" className="data-[state=active]:bg-soft-amber data-[state=active]:text-white">
-                <MessageSquare className="w-4 h-4 mr-2" />
-                Welcome Modals
+              <TabsTrigger
+                value="branding"
+                className="data-[state=active]:bg-soft-amber data-[state=active]:text-white data-[state=active]:border-soft-amber data-[state=active]:shadow-sm text-graphite"
+              >
+                <Globe2 className="w-4 h-4 mr-2" />
+                Brand Settings
               </TabsTrigger>
-              <TabsTrigger value="logo" className="data-[state=active]:bg-soft-amber data-[state=active]:text-white">
+              <TabsTrigger
+                value="logo"
+                className="data-[state=active]:bg-soft-amber data-[state=active]:text-white data-[state=active]:border-soft-amber data-[state=active]:shadow-sm text-graphite"
+              >
                 <Edit className="w-4 h-4 mr-2" />
                 Logo Settings
               </TabsTrigger>
@@ -620,7 +738,7 @@ export default function WelcomeEditorPage() {
                               type="file"
                               accept="image/*"
                               className="hidden"
-                              onChange={(e) => handleImageUpload(e, "hero", true)}
+                              onChange={(e) => handleImageUpload(e, "hero")}
                               disabled={uploadingImage.isUploading}
                             />
                           </label>
@@ -903,7 +1021,7 @@ export default function WelcomeEditorPage() {
                               type="file"
                               accept="image/*"
                               className="hidden"
-                              onChange={(e) => handleImageUpload(e, "forDoctors", true)}
+                              onChange={(e) => handleImageUpload(e, "forDoctors")}
                               disabled={uploadingImage.isUploading}
                             />
                           </label>
@@ -918,97 +1036,100 @@ export default function WelcomeEditorPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="welcome" className="space-y-6 mt-0">
-              {/* Patient Welcome */}
+            <TabsContent value="branding" className="space-y-6 mt-0">
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center">
-                    <MessageSquare className="h-5 w-5 mr-2 text-soft-amber" />
-                    Patient Welcome
+                    <Globe2 className="h-5 w-5 mr-2 text-soft-amber" />
+                    Brand Identity
                   </CardTitle>
-                  <CardDescription>Welcome modal shown to patients after login</CardDescription>
+                  <CardDescription>Control brand name, tagline, and favicon for the public site</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="patient-title" className="block text-sm font-medium text-graphite mb-1">
-                          Title
+                        <label htmlFor="brand-name" className="block text-sm font-medium text-graphite mb-1">
+                          Brand Name
                         </label>
                         <input
                           type="text"
-                          id="patient-title"
-                          value={welcomeContent.patient.title}
-                          onChange={(e) => handleWelcomeChange("patient", "title", e.target.value)}
+                          id="brand-name"
+                          value={landingContent.branding.name}
+                          onChange={(e) => handleBrandingChange("name", e.target.value)}
                           className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
                         />
                       </div>
                       <div>
-                        <label htmlFor="patient-description" className="block text-sm font-medium text-graphite mb-1">
-                          Description
+                        <label htmlFor="brand-tagline" className="block text-sm font-medium text-graphite mb-1">
+                          Tagline
                         </label>
-                        <textarea
-                          id="patient-description"
-                          value={welcomeContent.patient.description}
-                          onChange={(e) => handleWelcomeChange("patient", "description", e.target.value)}
-                          rows={4}
+                        <input
+                          type="text"
+                          id="brand-tagline"
+                          value={landingContent.branding.tagline}
+                          onChange={(e) => handleBrandingChange("tagline", e.target.value)}
                           className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
                         />
                       </div>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="patient-show"
-                          checked={welcomeContent.patient.showOnLogin}
-                          onChange={(e) => handleWelcomeChange("patient", "showOnLogin", e.target.checked)}
-                          className="h-4 w-4 text-soft-amber border-earth-beige rounded focus:ring-soft-amber"
-                        />
-                        <label htmlFor="patient-show" className="ml-2 block text-sm text-graphite">
-                          Show welcome message on login
+                      <div>
+                        <label htmlFor="brand-description" className="block text-sm font-medium text-graphite mb-1">
+                          Short Description
                         </label>
+                        <textarea
+                          id="brand-description"
+                          rows={4}
+                          value={landingContent.branding.description}
+                          onChange={(e) => handleBrandingChange("description", e.target.value)}
+                          className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="brand-logo-url" className="block text-sm font-medium text-graphite mb-1">
+                          Logo Image URL (optional)
+                        </label>
+                        <input
+                          type="text"
+                          id="brand-logo-url"
+                          value={landingContent.branding.logoUrl}
+                          onChange={(e) => handleBrandingChange("logoUrl", e.target.value)}
+                          className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                          placeholder="Paste a hosted logo URL or use the Logo tab for uploaded logos"
+                        />
                       </div>
                     </div>
                     <div className="space-y-4">
-                      <label className="block text-sm font-medium text-graphite mb-1">Welcome Image</label>
+                      <label className="block text-sm font-medium text-graphite mb-1">Favicon</label>
                       <div className="border border-earth-beige rounded-md p-4 bg-pale-stone/20">
-                        <div className="aspect-video bg-pale-stone rounded-md overflow-hidden mb-4">
-                          {welcomeContent.patient.imageUrl ? (
+                        <div className="aspect-square w-20 h-20 bg-pale-stone rounded-md overflow-hidden mb-4 flex items-center justify-center mx-auto">
+                          {landingContent.branding.faviconUrl ? (
                             <img
-                              src={welcomeContent.patient.imageUrl || "/placeholder.svg"}
-                              alt="Patient Welcome"
-                              className="w-full h-full object-cover"
+                              src={landingContent.branding.faviconUrl}
+                              alt="Favicon preview"
+                              className="w-full h-full object-contain"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-drift-gray">
                               <ImageIcon className="h-8 w-8 mr-2 text-drift-gray/50" />
-                              No image selected
+                              No favicon
                             </div>
                           )}
                         </div>
-                        <div className="flex space-x-2">
-                          <label className="flex items-center px-4 py-2 bg-white border border-earth-beige rounded-md text-sm font-medium text-graphite hover:bg-pale-stone cursor-pointer">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 space-y-2 sm:space-y-0">
+                          <label className="flex items-center justify-center px-4 py-2 bg-white border border-earth-beige rounded-md text-sm font-medium text-graphite hover:bg-pale-stone cursor-pointer">
                             <Upload className="w-4 h-4 mr-2" />
-                            Upload Image
+                            Upload Favicon
                             <input
                               type="file"
                               accept="image/*"
                               className="hidden"
-                              onChange={(e) => handleImageUpload(e, "patient")}
+                              onChange={(e) => handleBrandingImageUpload(e, "faviconUrl")}
                               disabled={uploadingImage.isUploading}
                             />
                           </label>
-                          {welcomeContent.patient.imageUrl && (
-                            <button
-                              onClick={() => handleImageDelete("patient")}
-                              className="flex items-center px-4 py-2 bg-white border border-earth-beige rounded-md text-sm font-medium text-red-500 hover:bg-pale-stone"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </button>
-                          )}
                         </div>
                         <p className="text-xs text-drift-gray mt-2">
-                          Max file size: 1MB. Recommended dimensions: 600x400px.
+                          Recommended size: 64x64px. Max file size: 1MB.
                         </p>
                       </div>
                     </div>
@@ -1016,241 +1137,95 @@ export default function WelcomeEditorPage() {
                 </CardContent>
               </Card>
 
-              {/* Doctor Welcome */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-lg flex items-center">
-                    <MessageSquare className="h-5 w-5 mr-2 text-soft-amber" />
-                    Doctor Welcome
+                    <Globe2 className="h-5 w-5 mr-2 text-soft-amber" />
+                    Contact & Footer
                   </CardTitle>
-                  <CardDescription>Welcome modal shown to doctors after login</CardDescription>
+                  <CardDescription>Manage footer content, social links, and contact details</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="doctor-title" className="block text-sm font-medium text-graphite mb-1">
-                          Title
-                        </label>
+                        <label className="block text-sm font-medium text-graphite mb-1">Address</label>
+                        <textarea
+                          rows={3}
+                          value={landingContent.branding.contact.address}
+                          onChange={(e) => handleBrandingContactChange("address", e.target.value)}
+                          className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-graphite mb-1">Phone</label>
                         <input
                           type="text"
-                          id="doctor-title"
-                          value={welcomeContent.doctor.title}
-                          onChange={(e) => handleWelcomeChange("doctor", "title", e.target.value)}
+                          value={landingContent.branding.contact.phone}
+                          onChange={(e) => handleBrandingContactChange("phone", e.target.value)}
                           className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
                         />
                       </div>
                       <div>
-                        <label htmlFor="doctor-description" className="block text-sm font-medium text-graphite mb-1">
-                          Description
-                        </label>
-                        <textarea
-                          id="doctor-description"
-                          value={welcomeContent.doctor.description}
-                          onChange={(e) => handleWelcomeChange("doctor", "description", e.target.value)}
-                          rows={4}
-                          className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
-                        />
-                      </div>
-                      <div className="flex items-center">
+                        <label className="block text-sm font-medium text-graphite mb-1">Email</label>
                         <input
-                          type="checkbox"
-                          id="doctor-show"
-                          checked={welcomeContent.doctor.showOnLogin}
-                          onChange={(e) => handleWelcomeChange("doctor", "showOnLogin", e.target.checked)}
-                          className="h-4 w-4 text-soft-amber border-earth-beige rounded focus:ring-soft-amber"
+                          type="email"
+                          value={landingContent.branding.contact.email}
+                          onChange={(e) => handleBrandingContactChange("email", e.target.value)}
+                          className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
                         />
-                        <label htmlFor="doctor-show" className="ml-2 block text-sm text-graphite">
-                          Show welcome message on login
-                        </label>
                       </div>
                     </div>
-                    <div className="space-y-4">
-                      <label className="block text-sm font-medium text-graphite mb-1">Welcome Image</label>
-                      <div className="border border-earth-beige rounded-md p-4 bg-pale-stone/20">
-                        <div className="aspect-video bg-pale-stone rounded-md overflow-hidden mb-4">
-                          {welcomeContent.doctor.imageUrl ? (
-                            <img
-                              src={welcomeContent.doctor.imageUrl || "/placeholder.svg"}
-                              alt="Doctor Welcome"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-drift-gray">
-                              <ImageIcon className="h-8 w-8 mr-2 text-drift-gray/50" />
-                              No image selected
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex space-x-2">
-                          <label className="flex items-center px-4 py-2 bg-white border border-earth-beige rounded-md text-sm font-medium text-graphite hover:bg-pale-stone cursor-pointer">
-                            <Upload className="w-4 h-4 mr-2" />
-                            Upload Image
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => handleImageUpload(e, "doctor")}
-                              disabled={uploadingImage.isUploading}
-                            />
-                          </label>
-                          {welcomeContent.doctor.imageUrl && (
-                            <button
-                              onClick={() => handleImageDelete("doctor")}
-                              className="flex items-center px-4 py-2 bg-white border border-earth-beige rounded-md text-sm font-medium text-red-500 hover:bg-pale-stone"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                        <p className="text-xs text-drift-gray mt-2">
-                          Max file size: 1MB. Recommended dimensions: 600x400px.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Admin Welcome */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center">
-                    <MessageSquare className="h-5 w-5 mr-2 text-soft-amber" />
-                    Admin Welcome
-                  </CardTitle>
-                  <CardDescription>Welcome modal shown to administrators after login</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6 md:grid-cols-2">
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="admin-title" className="block text-sm font-medium text-graphite mb-1">
-                          Title
-                        </label>
+                        <label className="block text-sm font-medium text-graphite mb-1">Footer Description</label>
+                        <textarea
+                          rows={3}
+                          value={landingContent.branding.footer.description}
+                          onChange={(e) => handleBrandingFooterChange("description", e.target.value)}
+                          className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-graphite mb-1">Footer Note</label>
                         <input
                           type="text"
-                          id="admin-title"
-                          value={welcomeContent.admin.title}
-                          onChange={(e) => handleWelcomeChange("admin", "title", e.target.value)}
+                          value={landingContent.branding.footer.note}
+                          onChange={(e) => handleBrandingFooterChange("note", e.target.value)}
                           className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
                         />
                       </div>
-                      <div>
-                        <label htmlFor="admin-description" className="block text-sm font-medium text-graphite mb-1">
-                          Description
-                        </label>
-                        <textarea
-                          id="admin-description"
-                          value={welcomeContent.admin.description}
-                          onChange={(e) => handleWelcomeChange("admin", "description", e.target.value)}
-                          rows={4}
-                          className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
-                        />
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id="admin-show"
-                          checked={welcomeContent.admin.showOnLogin}
-                          onChange={(e) => handleWelcomeChange("admin", "showOnLogin", e.target.checked)}
-                          className="h-4 w-4 text-soft-amber border-earth-beige rounded focus:ring-soft-amber"
-                        />
-                        <label htmlFor="admin-show" className="ml-2 block text-sm text-graphite">
-                          Show welcome message on login
-                        </label>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <label className="block text-sm font-medium text-graphite mb-1">Welcome Image</label>
-                      <div className="border border-earth-beige rounded-md p-4 bg-pale-stone/20">
-                        <div className="aspect-video bg-pale-stone rounded-md overflow-hidden mb-4">
-                          {welcomeContent.admin.imageUrl ? (
-                            <img
-                              src={welcomeContent.admin.imageUrl || "/placeholder.svg"}
-                              alt="Admin Welcome"
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-drift-gray">
-                              <ImageIcon className="h-8 w-8 mr-2 text-drift-gray/50" />
-                              No image selected
-                            </div>
-                          )}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-graphite mb-1">Facebook</label>
+                          <input
+                            type="url"
+                            value={landingContent.branding.footer.socials.facebook}
+                            onChange={(e) => handleBrandingSocialChange("facebook", e.target.value)}
+                            className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                            placeholder="https://facebook.com/yourpage"
+                          />
                         </div>
-                        <div className="flex space-x-2">
-                          <label className="flex items-center px-4 py-2 bg-white border border-earth-beige rounded-md text-sm font-medium text-graphite hover:bg-pale-stone cursor-pointer">
-                            <Upload className="w-4 h-4 mr-2" />
-                            Upload Image
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => handleImageUpload(e, "admin")}
-                              disabled={uploadingImage.isUploading}
-                            />
-                          </label>
-                          {welcomeContent.admin.imageUrl && (
-                            <button
-                              onClick={() => handleImageDelete("admin")}
-                              className="flex items-center px-4 py-2 bg-white border border-earth-beige rounded-md text-sm font-medium text-red-500 hover:bg-pale-stone"
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </button>
-                          )}
+                        <div>
+                          <label className="block text-sm font-medium text-graphite mb-1">Twitter/X</label>
+                          <input
+                            type="url"
+                            value={landingContent.branding.footer.socials.twitter}
+                            onChange={(e) => handleBrandingSocialChange("twitter", e.target.value)}
+                            className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                            placeholder="https://twitter.com/yourhandle"
+                          />
                         </div>
-                        <p className="text-xs text-drift-gray mt-2">
-                          Max file size: 1MB. Recommended dimensions: 600x400px.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Preview Section */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center">
-                    <Eye className="h-5 w-5 mr-2 text-soft-amber" />
-                    Preview
-                  </CardTitle>
-                  <CardDescription>Preview how welcome modals will appear to users</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="border border-earth-beige rounded-md p-4 bg-pale-stone/10">
-                      <h3 className="font-medium text-graphite mb-2 flex items-center">
-                        <span className="w-2 h-2 bg-soft-amber rounded-full mr-2"></span>
-                        Patient Welcome
-                      </h3>
-                      <div className="bg-white rounded-md p-4 shadow-sm">
-                        <h4 className="text-lg font-semibold text-graphite">{welcomeContent.patient.title}</h4>
-                        <p className="text-drift-gray mt-2">{welcomeContent.patient.description}</p>
-                      </div>
-                    </div>
-
-                    <div className="border border-earth-beige rounded-md p-4 bg-pale-stone/10">
-                      <h3 className="font-medium text-graphite mb-2 flex items-center">
-                        <span className="w-2 h-2 bg-soft-amber rounded-full mr-2"></span>
-                        Doctor Welcome
-                      </h3>
-                      <div className="bg-white rounded-md p-4 shadow-sm">
-                        <h4 className="text-lg font-semibold text-graphite">{welcomeContent.doctor.title}</h4>
-                        <p className="text-drift-gray mt-2">{welcomeContent.doctor.description}</p>
-                      </div>
-                    </div>
-
-                    <div className="border border-earth-beige rounded-md p-4 bg-pale-stone/10">
-                      <h3 className="font-medium text-graphite mb-2 flex items-center">
-                        <span className="w-2 h-2 bg-soft-amber rounded-full mr-2"></span>
-                        Admin Welcome
-                      </h3>
-                      <div className="bg-white rounded-md p-4 shadow-sm">
-                        <h4 className="text-lg font-semibold text-graphite">{welcomeContent.admin.title}</h4>
-                        <p className="text-drift-gray mt-2">{welcomeContent.admin.description}</p>
+                        <div>
+                          <label className="block text-sm font-medium text-graphite mb-1">Instagram</label>
+                          <input
+                            type="url"
+                            value={landingContent.branding.footer.socials.instagram}
+                            onChange={(e) => handleBrandingSocialChange("instagram", e.target.value)}
+                            className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                            placeholder="https://instagram.com/yourprofile"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1323,22 +1298,40 @@ export default function WelcomeEditorPage() {
                             <option value="text-3xl">3XL</option>
                           </select>
                         </div>
-                        <div>
-                          <label htmlFor="logo-font-weight" className="block text-sm font-medium text-graphite mb-1">
-                            Font Weight
-                          </label>
-                          <select
-                            id="logo-font-weight"
-                            value={logoContent.fontWeight}
-                            onChange={(e) => handleLogoChange("fontWeight", e.target.value)}
-                            className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
-                          >
-                            <option value="font-normal">Normal</option>
-                            <option value="font-medium">Medium</option>
-                            <option value="font-semibold">Semibold</option>
-                            <option value="font-bold">Bold</option>
-                            <option value="font-extrabold">Extra Bold</option>
-                          </select>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label htmlFor="logo-font-weight" className="block text-sm font-medium text-graphite mb-1">
+                              Font Weight
+                            </label>
+                            <select
+                              id="logo-font-weight"
+                              value={logoContent.fontWeight}
+                              onChange={(e) => handleLogoChange("fontWeight", e.target.value)}
+                              className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                            >
+                              <option value="font-normal">Normal</option>
+                              <option value="font-medium">Medium</option>
+                              <option value="font-semibold">Semibold</option>
+                              <option value="font-bold">Bold</option>
+                              <option value="font-extrabold">Extra Bold</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label htmlFor="logo-image-height" className="block text-sm font-medium text-graphite mb-1">
+                              Logo Image Height (px)
+                            </label>
+                            <input
+                              type="number"
+                              id="logo-image-height"
+                              min={16}
+                              max={120}
+                              step={2}
+                              value={logoContent.imageHeight || 32}
+                              onChange={(e) => handleLogoChange("imageHeight", Number(e.target.value) || 32)}
+                              className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                            />
+                            <p className="text-xs text-drift-gray mt-1">Applies to header/navigation logos.</p>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1348,12 +1341,12 @@ export default function WelcomeEditorPage() {
                       <h3 className="font-medium text-graphite mb-4">Logo Image</h3>
                       <div className="space-y-4">
                         <div className="border border-earth-beige rounded-md p-4 bg-pale-stone/20">
-                          <div className="h-16 bg-white rounded-md overflow-hidden mb-4 flex items-center justify-center">
+                          <div className="h-24 sm:h-28 bg-white rounded-md overflow-hidden mb-4 flex items-center justify-center px-4">
                             {logoContent.imageUrl ? (
                               <img
                                 src={logoContent.imageUrl || "/placeholder.svg"}
                                 alt="Logo"
-                                className="h-full object-contain"
+                                className="h-full w-full object-contain"
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-drift-gray">
@@ -1385,7 +1378,7 @@ export default function WelcomeEditorPage() {
                             )}
                           </div>
                           <p className="text-xs text-drift-gray mt-2">
-                            Max file size: 500KB. Recommended dimensions: 180x60px. Transparent PNG recommended.
+                            Max file size: 500KB. Recommended dimensions: 300–400px wide, transparent PNG.
                           </p>
                         </div>
                       </div>
@@ -1400,7 +1393,7 @@ export default function WelcomeEditorPage() {
                               <img
                                 src={logoContent.imageUrl || "/placeholder.svg"}
                                 alt="Logo"
-                                className="h-9 object-contain"
+                                className="h-12 sm:h-14 object-contain"
                               />
                               <span className="ml-2 rounded-md bg-soft-amber px-2 py-1 text-xs font-medium text-white">
                                 Preview
