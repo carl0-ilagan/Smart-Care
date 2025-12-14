@@ -1,10 +1,17 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { EllipsisVerticalIcon } from "@heroicons/react/24/outline"
+import { MoreVertical, Bell, BellOff, Trash2, Mail } from "lucide-react"
 import DeleteConversationModal from "./delete-conversation-modal"
 
-const ConversationOptionsMenu = ({ onMarkAsUnread, onDelete, className = "" }) => {
+const ConversationOptionsMenu = ({ 
+  onMarkAsUnread, 
+  onDelete, 
+  onMute,
+  onUnmute,
+  isMuted = false,
+  className = "" 
+}) => {
   const [showMenu, setShowMenu] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -17,11 +24,14 @@ const ConversationOptionsMenu = ({ onMarkAsUnread, onDelete, className = "" }) =
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
+    if (showMenu) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [])
+  }, [showMenu])
 
   const handleMenuItemClick = (action) => {
     setShowMenu(false)
@@ -51,28 +61,63 @@ const ConversationOptionsMenu = ({ onMarkAsUnread, onDelete, className = "" }) =
 
   return (
     <div className={`relative ${className}`} ref={menuRef}>
-      <button onClick={() => setShowMenu(!showMenu)} className="p-1 rounded-full hover:bg-gray-100">
-        <EllipsisVerticalIcon className="h-5 w-5 text-gray-500" />
+      <button 
+        onClick={() => setShowMenu(!showMenu)} 
+        className="p-1.5 rounded-full hover:bg-pale-stone transition-colors duration-200 text-drift-gray hover:text-graphite"
+      >
+        <MoreVertical className="h-5 w-5" />
       </button>
 
-      {showMenu && (
-        <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-10 border">
-          <div className="py-1">
+      {/* Dropdown with smooth animations */}
+      <div
+        className={`absolute right-0 mt-1 w-48 origin-top rounded-lg border border-earth-beige bg-white shadow-lg z-50 transition-all duration-200 ease-out ${
+          showMenu 
+            ? "scale-100 opacity-100 translate-y-0 pointer-events-auto" 
+            : "scale-95 opacity-0 -translate-y-1 pointer-events-none"
+        }`}
+      >
+        <div className="py-1">
+          {onMarkAsUnread && (
             <button
               onClick={() => handleMenuItemClick(onMarkAsUnread)}
-              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="w-full text-left px-4 py-2.5 text-sm text-graphite hover:bg-pale-stone transition-colors duration-150 flex items-center gap-2.5 dropdown-item"
             >
-              Mark as unread
+              <Mail className="h-4 w-4 text-drift-gray" />
+              <span>Mark as unread</span>
             </button>
+          )}
+          
+          {onMute && !isMuted && (
             <button
-              onClick={handleDeleteClick}
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+              onClick={() => handleMenuItemClick(onMute)}
+              className="w-full text-left px-4 py-2.5 text-sm text-graphite hover:bg-pale-stone transition-colors duration-150 flex items-center gap-2.5 dropdown-item"
             >
-              Delete conversation
+              <BellOff className="h-4 w-4 text-drift-gray" />
+              <span>Mute conversation</span>
             </button>
-          </div>
+          )}
+          
+          {onUnmute && isMuted && (
+            <button
+              onClick={() => handleMenuItemClick(onUnmute)}
+              className="w-full text-left px-4 py-2.5 text-sm text-graphite hover:bg-pale-stone transition-colors duration-150 flex items-center gap-2.5 dropdown-item"
+            >
+              <Bell className="h-4 w-4 text-drift-gray" />
+              <span>Unmute conversation</span>
+            </button>
+          )}
+          
+          <div className="my-1 border-t border-pale-stone"></div>
+          
+          <button
+            onClick={handleDeleteClick}
+            className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors duration-150 flex items-center gap-2.5 dropdown-item"
+          >
+            <Trash2 className="h-4 w-4 text-red-600" />
+            <span>Delete conversation</span>
+          </button>
         </div>
-      )}
+      </div>
 
       <DeleteConversationModal
         isOpen={showDeleteModal}

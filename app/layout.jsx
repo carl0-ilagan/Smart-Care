@@ -15,7 +15,6 @@ export const metadata = {
   title: "Smart Care - Your Health, One Click Away",
   description: "A modern telehealth platform for all your healthcare needs",
   manifest: "/manifest.json",
-  themeColor: "#f59e0b",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -30,6 +29,10 @@ export const metadata = {
     title: "Smart Care - Your Health, One Click Away",
     description: "A modern telehealth platform for all your healthcare needs",
   },
+}
+
+export const viewport = {
+  themeColor: "#f59e0b",
 }
 
 export default function RootLayout({ children }) {

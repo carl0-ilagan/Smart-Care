@@ -275,24 +275,28 @@ export default function PatientRecordsPage() {
         <div className="flex p-1 bg-earth-beige/20 rounded-full shadow-sm">
           <button
             onClick={() => setActiveTab("records")}
-            className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+            className={`relative px-5 py-2.5 pr-7 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-2 ${
               activeTab === "records" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
             }`}
           >
-            <span className="relative z-10">Medical Records</span>
-            {activeTab === "records" && medicalRecords.length > 0 && (
-              <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center bg-white text-soft-amber text-xs w-5 h-5 rounded-full">
+            <span>Medical Records</span>
+            {medicalRecords.length > 0 && (
+              <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-semibold ${
+                activeTab === "records" 
+                  ? "bg-white/20 text-white border border-white/30" 
+                  : "bg-soft-amber text-white"
+              }`}>
                 {medicalRecords.length}
               </span>
             )}
           </button>
           <button
             onClick={() => setActiveTab("history")}
-            className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+            className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 ${
               activeTab === "history" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
             }`}
           >
-            <span className="relative z-10">Appointment History</span>
+            <span>Appointment History</span>
           </button>
         </div>
       </div>

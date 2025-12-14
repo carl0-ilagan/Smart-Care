@@ -40,6 +40,17 @@ export default function DoctorLayout({ children }) {
     }
   }, [pathname, children, currentPath])
 
+  // Hide scrollbar on body/html for doctor pages
+  useEffect(() => {
+    document.body.classList.add("scrollbar-hide")
+    document.documentElement.classList.add("scrollbar-hide")
+    
+    return () => {
+      document.body.classList.remove("scrollbar-hide")
+      document.documentElement.classList.remove("scrollbar-hide")
+    }
+  }, [])
+
   // Don't show navigation on chat page for full screen experience
   if (isMessagesPage) {
     return <ProtectedRoute requiredRole="doctor">{children}</ProtectedRoute>
@@ -47,10 +58,10 @@ export default function DoctorLayout({ children }) {
 
   return (
     <ProtectedRoute requiredRole="doctor">
-      <div className="min-h-screen bg-pale-stone">
+      <div className="min-h-screen bg-pale-stone scrollbar-hide">
         <OfflineIndicator />
         <DoctorTopNav showMobileMenu={showMobileMenu} setShowMobileMenu={setShowMobileMenu} />
-        <main className="mx-auto w-full max-w-screen-2xl px-3 pb-20 pt-24 md:px-4 md:pb-12 lg:px-6 xl:px-8">
+        <main className="mx-auto w-full max-w-screen-2xl px-3 pb-20 pt-24 md:px-4 md:pb-12 lg:px-6 xl:px-8 scrollbar-hide overflow-y-auto">
           <div className={`${isPageTransitioning ? "opacity-0" : "page-transition-enter"}`}>{content}</div>
         </main>
         {isMobile && <DoctorMobileNav />}

@@ -979,65 +979,57 @@ export default function AdminPatientDetailsPage() {
             <div className="flex p-1 bg-earth-beige/20 rounded-full shadow-sm">
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-1.5 ${
                   activeTab === "profile" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
                 }`}
               >
-                <span className="relative z-10 flex items-center">
-                  <User className="h-4 w-4 mr-1.5" />
-                  Profile
-                </span>
+                <User className="h-4 w-4" />
+                <span>Profile</span>
               </button>
               <button
                 onClick={() => {
                   setActiveTab("appointments")
                   logAccessAttempt("appointments")
                 }}
-                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-1.5 ${
                   activeTab === "appointments"
                     ? "bg-soft-amber text-white shadow-sm"
                     : "text-drift-gray hover:text-graphite"
                 }`}
               >
-                <span className="relative z-10 flex items-center">
-                  <CalendarDays className="h-4 w-4 mr-1.5" />
-                  Appointments
-                  {accessStatus.appointments !== "granted" && <Lock className="h-3 w-3 ml-1 text-gray-400" />}
-                </span>
+                <CalendarDays className="h-4 w-4" />
+                <span>Appointments</span>
+                {accessStatus.appointments !== "granted" && <Lock className="h-3 w-3 text-gray-400" />}
               </button>
               <button
                 onClick={() => {
                   setActiveTab("records")
                   logAccessAttempt("records")
                 }}
-                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-1.5 ${
                   activeTab === "records" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
                 }`}
               >
-                <span className="relative z-10 flex items-center">
-                  <FileIcon className="h-4 w-4 mr-1.5" />
-                  Health Records
-                  {accessStatus.records !== "granted" && <Lock className="h-3 w-3 ml-1 text-gray-400" />}
-                </span>
+                <FileIcon className="h-4 w-4" />
+                <span>Health Records</span>
+                {accessStatus.records !== "granted" && <Lock className="h-3 w-3 text-gray-400" />}
               </button>
               <button
                 onClick={() => {
                   setActiveTab("prescriptions")
                   logAccessAttempt("prescriptions")
                 }}
-                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-1.5 ${
                   activeTab === "prescriptions"
                     ? "bg-soft-amber text-white shadow-sm"
                     : "text-drift-gray hover:text-graphite"
                 }`}
               >
-                <span className="relative z-10 flex items-center">
-                  <Pill className="h-4 w-4 mr-1.5" />
-                  Prescriptions
-                  {accessStatus.prescriptions !== "granted" && <Lock className="h-3 w-3 ml-1 text-gray-400" />}
-                </span>
+                <Pill className="h-4 w-4" />
+                <span>Prescriptions</span>
+                {accessStatus.prescriptions !== "granted" && <Lock className="h-3 w-3 text-gray-400" />}
               </button>
-              </div>
+            </div>
             </div>
           </div>
 

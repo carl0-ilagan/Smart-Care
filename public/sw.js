@@ -1,13 +1,21 @@
 // Service Worker for Smart Care PWA
-const CACHE_NAME = 'smart-care-v2'
-const STATIC_CACHE = 'smart-care-static-v2'
-const DYNAMIC_CACHE = 'smart-care-dynamic-v2'
-const API_CACHE = 'smart-care-api-v2'
+const CACHE_NAME = 'smart-care-v3'
+const STATIC_CACHE = 'smart-care-static-v3'
+const DYNAMIC_CACHE = 'smart-care-dynamic-v3'
+const API_CACHE = 'smart-care-api-v3'
 
 // Static assets to cache on install (for all roles: patient, doctor, admin)
 const urlsToCache = [
+  // Landing page and public pages
   '/',
-  // Patient pages
+  '/login',
+  '/signup',
+  '/forgot-password',
+  '/information',
+  '/privacy',
+  '/terms',
+  
+  // Patient (Dashboard) pages - ALL routes
   '/dashboard',
   '/dashboard/appointments',
   '/dashboard/messages',
@@ -16,21 +24,48 @@ const urlsToCache = [
   '/dashboard/notifications',
   '/dashboard/settings',
   '/dashboard/profile',
-  // Doctor pages
+  '/dashboard/doctors',
+  '/dashboard/feedback',
+  '/dashboard/calls',
+  
+  // Doctor pages - ALL routes
   '/doctor/dashboard',
   '/doctor/appointments',
+  '/doctor/appointments/new',
   '/doctor/chat',
   '/doctor/patients',
+  '/doctor/prescriptions',
+  '/doctor/prescriptions/new',
+  '/doctor/records',
+  '/doctor/notifications',
   '/doctor/settings',
-  // Admin pages
+  '/doctor/profile',
+  '/doctor/calls',
+  '/doctor/feedback',
+  // Note: Dynamic routes like /doctor/patients/[id] will be cached automatically when visited
+  
+  // Admin pages - ALL routes
   '/admin/dashboard',
   '/admin/patients',
   '/admin/doctors',
   '/admin/appointments',
   '/admin/settings',
+  '/admin/profile',
+  '/admin/analytics',
+  '/admin/feedback',
+  '/admin/information-pages',
+  '/admin/logs',
+  '/admin/pending-accounts',
+  '/admin/reports',
+  '/admin/roles',
+  '/admin/welcome-editor',
+  
   // Assets
   '/SmartCare.png',
   '/manifest.json',
+  '/favicon.ico',
+  '/logo.svg',
+  '/placeholder-user.jpg',
 ]
 
 // Cache strategies
@@ -46,24 +81,21 @@ const CACHE_STRATEGIES = {
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker...')
   event.waitUntil(
-    Promise.all([
-      // Cache static assets
-      caches.open(STATIC_CACHE).then((cache) => {
-      return cache.addAll(urlsToCache).catch((err) => {
-          console.log('[SW] Failed to cache some static resources:', err)
+    caches.open(STATIC_CACHE).then((cache) => {
+      // Use individual cache.add() calls instead of addAll() to handle failures gracefully
+      // This way, if one URL fails, others can still be cached
+      const cachePromises = urlsToCache.map((url) => {
+        return cache.add(url).catch((err) => {
+          // Log but don't fail - some routes might not exist in development
+          console.log(`[SW] Failed to cache ${url}:`, err.message)
+          return null // Return null so Promise.all doesn't fail
         })
-      }),
-      // Cache common static assets
-      caches.open(STATIC_CACHE).then((cache) => {
-        return cache.addAll([
-          '/favicon.ico',
-          '/logo.svg',
-          '/placeholder-user.jpg',
-        ]).catch((err) => {
-          console.log('[SW] Failed to cache additional static resources:', err)
       })
-      }),
-    ])
+      
+      return Promise.all(cachePromises).then(() => {
+        console.log('[SW] Static cache populated (some resources may have failed in development)')
+      })
+    })
   )
   self.skipWaiting()
 })
@@ -109,7 +141,8 @@ function getCacheStrategy(request) {
     return CACHE_STRATEGIES.NETWORK_FIRST
   }
 
-  // HTML pages - stale while revalidate
+  // HTML pages - stale while revalidate for offline support
+  // This includes all pages: landing, dashboard, doctor, admin, profile, etc.
   if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
     return CACHE_STRATEGIES.STALE_WHILE_REVALIDATE
   }
@@ -132,8 +165,68 @@ async function cacheFirst(request, cacheName) {
     }
     return response
   } catch (error) {
-    // If offline and no cache, return offline page for navigation
+    // If offline and no cache, try route-specific fallbacks for navigation
     if (request.mode === 'navigate') {
+      const url = new URL(request.url)
+      const pathname = url.pathname
+      
+      // For dashboard routes, try smart fallback hierarchy
+      if (pathname.startsWith('/dashboard')) {
+        // Try exact parent route first (e.g., /dashboard/doctors for /dashboard/doctors/123)
+        const pathParts = pathname.split('/').filter(Boolean)
+        if (pathParts.length > 2) {
+          const parentPath = '/' + pathParts.slice(0, -1).join('/')
+          const parentPage = await cache.match(parentPath)
+          if (parentPage) return parentPage
+        }
+        
+        // Try common dashboard routes in order of preference
+        const fallbackRoutes = [
+          '/dashboard',
+          '/dashboard/appointments',
+          '/dashboard/messages',
+          '/dashboard/prescriptions',
+          '/dashboard/records',
+        ]
+        
+        for (const route of fallbackRoutes) {
+          const fallbackPage = await cache.match(route)
+          if (fallbackPage) return fallbackPage
+        }
+      } else if (pathname.startsWith('/doctor')) {
+        const pathParts = pathname.split('/').filter(Boolean)
+        if (pathParts.length > 2) {
+          const parentPath = '/' + pathParts.slice(0, -1).join('/')
+          const parentPage = await cache.match(parentPath)
+          if (parentPage) return parentPage
+        }
+        
+        // Try common doctor routes in order of preference
+        const fallbackRoutes = [
+          '/doctor/dashboard',
+          '/doctor/appointments',
+          '/doctor/patients',
+          '/doctor/prescriptions',
+          '/doctor/chat',
+          '/doctor/records',
+        ]
+        
+        for (const route of fallbackRoutes) {
+          const fallbackPage = await cache.match(route)
+          if (fallbackPage) return fallbackPage
+        }
+      } else if (pathname.startsWith('/admin')) {
+        const pathParts = pathname.split('/').filter(Boolean)
+        if (pathParts.length > 2) {
+          const parentPath = '/' + pathParts.slice(0, -1).join('/')
+          const parentPage = await cache.match(parentPath)
+          if (parentPage) return parentPage
+        }
+        const adminPage = await cache.match('/admin/dashboard')
+        if (adminPage) return adminPage
+      }
+      
+      // Final fallback: landing page
       const offlinePage = await cache.match('/')
       if (offlinePage) return offlinePage
     }
@@ -147,16 +240,79 @@ async function networkFirst(request, cacheName) {
   try {
     const response = await fetch(request)
     if (response.ok) {
+      // Cache all successful responses (including dynamic routes)
       cache.put(request, response.clone())
     }
     return response
   } catch (error) {
+    // Try exact cache match first
     const cached = await cache.match(request)
     if (cached) {
       return cached
     }
-    // For navigation requests, return offline page
+    
+    // For navigation requests, try route-specific fallbacks
     if (request.mode === 'navigate') {
+      const url = new URL(request.url)
+      const pathname = url.pathname
+      
+      // For dashboard routes, try smart fallback hierarchy
+      if (pathname.startsWith('/dashboard')) {
+        // Try exact parent route first (e.g., /dashboard/doctors for /dashboard/doctors/123)
+        const pathParts = pathname.split('/').filter(Boolean)
+        if (pathParts.length > 2) {
+          const parentPath = '/' + pathParts.slice(0, -1).join('/')
+          const parentPage = await cache.match(parentPath)
+          if (parentPage) return parentPage
+        }
+        
+        // Try common dashboard routes in order of preference
+        const fallbackRoutes = [
+          '/dashboard',
+          '/dashboard/appointments',
+          '/dashboard/messages',
+          '/dashboard/prescriptions',
+          '/dashboard/records',
+        ]
+        
+        for (const route of fallbackRoutes) {
+          const fallbackPage = await cache.match(route)
+          if (fallbackPage) return fallbackPage
+        }
+      } else if (pathname.startsWith('/doctor')) {
+        const pathParts = pathname.split('/').filter(Boolean)
+        if (pathParts.length > 2) {
+          const parentPath = '/' + pathParts.slice(0, -1).join('/')
+          const parentPage = await cache.match(parentPath)
+          if (parentPage) return parentPage
+        }
+        
+        // Try common doctor routes in order of preference
+        const fallbackRoutes = [
+          '/doctor/dashboard',
+          '/doctor/appointments',
+          '/doctor/patients',
+          '/doctor/prescriptions',
+          '/doctor/chat',
+          '/doctor/records',
+        ]
+        
+        for (const route of fallbackRoutes) {
+          const fallbackPage = await cache.match(route)
+          if (fallbackPage) return fallbackPage
+        }
+      } else if (pathname.startsWith('/admin')) {
+        const pathParts = pathname.split('/').filter(Boolean)
+        if (pathParts.length > 2) {
+          const parentPath = '/' + pathParts.slice(0, -1).join('/')
+          const parentPage = await cache.match(parentPath)
+          if (parentPage) return parentPage
+        }
+        const adminPage = await cache.match('/admin/dashboard')
+        if (adminPage) return adminPage
+      }
+      
+      // Final fallback: landing page
       const offlinePage = await cache.match('/')
       if (offlinePage) return offlinePage
     }
@@ -188,8 +344,76 @@ async function staleWhileRevalidate(request, cacheName) {
   try {
     return await fetchPromise
   } catch (error) {
-    // If offline and navigation, return offline page
+    // If offline and navigation, try to find any cached page with smart fallback
     if (request.mode === 'navigate') {
+      const url = new URL(request.url)
+      const pathname = url.pathname
+      
+      // For dashboard routes, try smart fallback hierarchy
+      if (pathname.startsWith('/dashboard')) {
+        // Try exact parent route first (e.g., /dashboard/doctors for /dashboard/doctors/123)
+        const pathParts = pathname.split('/').filter(Boolean)
+        if (pathParts.length > 2) {
+          // Remove last part (dynamic ID) and try parent route
+          const parentPath = '/' + pathParts.slice(0, -1).join('/')
+          const parentPage = await cache.match(parentPath)
+          if (parentPage) return parentPage
+        }
+        
+        // Try common dashboard routes in order of preference
+        const fallbackRoutes = [
+          '/dashboard',
+          '/dashboard/appointments',
+          '/dashboard/messages',
+          '/dashboard/prescriptions',
+          '/dashboard/records',
+        ]
+        
+        for (const route of fallbackRoutes) {
+          const fallbackPage = await cache.match(route)
+          if (fallbackPage) return fallbackPage
+        }
+      }
+      
+      // For doctor routes, try smart fallback hierarchy
+      if (pathname.startsWith('/doctor')) {
+        // Try exact parent route first (e.g., /doctor/patients for /doctor/patients/123)
+        const pathParts = pathname.split('/').filter(Boolean)
+        if (pathParts.length > 2) {
+          const parentPath = '/' + pathParts.slice(0, -1).join('/')
+          const parentPage = await cache.match(parentPath)
+          if (parentPage) return parentPage
+        }
+        
+        // Try common doctor routes in order of preference
+        const fallbackRoutes = [
+          '/doctor/dashboard',
+          '/doctor/appointments',
+          '/doctor/patients',
+          '/doctor/prescriptions',
+          '/doctor/chat',
+          '/doctor/records',
+        ]
+        
+        for (const route of fallbackRoutes) {
+          const fallbackPage = await cache.match(route)
+          if (fallbackPage) return fallbackPage
+        }
+      }
+      
+      // For admin routes
+      if (pathname.startsWith('/admin')) {
+        const pathParts = pathname.split('/').filter(Boolean)
+        if (pathParts.length > 2) {
+          const parentPath = '/' + pathParts.slice(0, -1).join('/')
+          const parentPage = await cache.match(parentPath)
+          if (parentPage) return parentPage
+        }
+        const adminPage = await cache.match('/admin/dashboard')
+        if (adminPage) return adminPage
+      }
+      
+      // Final fallback: landing page
       const offlinePage = await cache.match('/')
       if (offlinePage) return offlinePage
     }
@@ -250,15 +474,78 @@ self.addEventListener('fetch', (event) => {
         }
       } catch (error) {
         console.error('[SW] Fetch error:', error)
-        // For navigation requests, try to return offline page
+        // For navigation requests, try to return cached page with smart fallback
         if (event.request.mode === 'navigate') {
           const cache = await caches.open(STATIC_CACHE)
-          const offlinePage = await cache.match('/')
-          if (offlinePage) {
-            return offlinePage
+          const dynamicCache = await caches.open(DYNAMIC_CACHE)
+          const url = new URL(event.request.url)
+          const pathname = url.pathname
+          
+          // Try exact match in both caches
+          let offlinePage = await cache.match(event.request) || await dynamicCache.match(event.request)
+          if (offlinePage) return offlinePage
+          
+          // For dashboard routes, try smart fallback hierarchy
+          if (pathname.startsWith('/dashboard')) {
+            // Try exact parent route first (e.g., /dashboard/doctors for /dashboard/doctors/123)
+            const pathParts = pathname.split('/').filter(Boolean)
+            if (pathParts.length > 2) {
+              const parentPath = '/' + pathParts.slice(0, -1).join('/')
+              offlinePage = await cache.match(parentPath) || await dynamicCache.match(parentPath)
+              if (offlinePage) return offlinePage
+            }
+            
+            // Try common dashboard routes in order of preference
+            const fallbackRoutes = [
+              '/dashboard',
+              '/dashboard/appointments',
+              '/dashboard/messages',
+              '/dashboard/prescriptions',
+              '/dashboard/records',
+            ]
+            
+            for (const route of fallbackRoutes) {
+              offlinePage = await cache.match(route) || await dynamicCache.match(route)
+              if (offlinePage) return offlinePage
+            }
+          } else if (pathname.startsWith('/doctor')) {
+            const pathParts = pathname.split('/').filter(Boolean)
+            if (pathParts.length > 2) {
+              const parentPath = '/' + pathParts.slice(0, -1).join('/')
+              offlinePage = await cache.match(parentPath) || await dynamicCache.match(parentPath)
+              if (offlinePage) return offlinePage
+            }
+            
+            // Try common doctor routes in order of preference
+            const fallbackRoutes = [
+              '/doctor/dashboard',
+              '/doctor/appointments',
+              '/doctor/patients',
+              '/doctor/prescriptions',
+              '/doctor/chat',
+              '/doctor/records',
+            ]
+            
+            for (const route of fallbackRoutes) {
+              offlinePage = await cache.match(route) || await dynamicCache.match(route)
+              if (offlinePage) return offlinePage
+            }
+          } else if (pathname.startsWith('/admin')) {
+            const pathParts = pathname.split('/').filter(Boolean)
+            if (pathParts.length > 2) {
+              const parentPath = '/' + pathParts.slice(0, -1).join('/')
+              offlinePage = await cache.match(parentPath) || await dynamicCache.match(parentPath)
+              if (offlinePage) return offlinePage
+            }
+            offlinePage = await cache.match('/admin/dashboard') || await dynamicCache.match('/admin/dashboard')
+            if (offlinePage) return offlinePage
           }
+          
+          // Final fallback: landing page
+          offlinePage = await cache.match('/') || await dynamicCache.match('/')
+          if (offlinePage) return offlinePage
         }
-        // Return offline message
+        // Return offline message as last resort
         return new Response('Offline - Please check your connection', { 
           status: 200,
           headers: { 'Content-Type': 'text/html; charset=utf-8' }
@@ -285,7 +572,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options))
 })
 
-// Handle messages from the app (for triggering push notifications)
+// Handle messages from the app (for triggering push notifications and pre-caching)
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'PUSH_NOTIFICATION') {
     const { payload } = event.data
@@ -303,6 +590,35 @@ self.addEventListener('message', (event) => {
     }).catch((error) => {
       console.error('Error showing notification:', error)
     })
+  }
+  
+  // Handle pre-cache requests for specific pages
+  if (event.data && event.data.type === 'PRE_CACHE') {
+    const { urls } = event.data
+    if (urls && Array.isArray(urls)) {
+      event.waitUntil(
+        caches.open(DYNAMIC_CACHE).then((cache) => {
+          return Promise.all(
+            urls.map((url) => {
+              return fetch(url)
+                .then((response) => {
+                  if (response.ok) {
+                    return cache.put(url, response)
+                  }
+                })
+                .catch((error) => {
+                  console.log('[SW] Failed to pre-cache:', url, error)
+                })
+            })
+          )
+        })
+      )
+    }
+  }
+  
+  // Handle skip waiting (for service worker updates)
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting()
   }
 })
 

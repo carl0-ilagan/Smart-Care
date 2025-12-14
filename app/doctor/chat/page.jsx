@@ -15,6 +15,13 @@ import {
   Loader2,
   ArrowUp,
   BellOff,
+  Phone,
+  Mail,
+  Calendar,
+  Heart,
+  Pill,
+  AlertTriangle,
+  User,
 } from "lucide-react"
 import { useMobile } from "@/hooks/use-mobile"
 import Link from "next/link"
@@ -778,7 +785,7 @@ export default function DoctorChatPage() {
         )}
       </div>
 
-      <div ref={conversationsContainerRef} className="flex-1 overflow-y-auto relative h-full">
+      <div ref={conversationsContainerRef} className="flex-1 overflow-y-auto relative h-full scrollbar-hide">
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-soft-amber" />
@@ -940,7 +947,7 @@ export default function DoctorChatPage() {
           </div>
 
           {/* Messages (only this area scrolls) */}
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 h-full">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 h-full scrollbar-hide">
             {messagesLoading ? (
               <div className="flex h-full items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-soft-amber" />
@@ -992,6 +999,8 @@ export default function DoctorChatPage() {
                       currentUserName={user?.displayName}
                       patientDetails={patientDetails}
                       doctorDetails={user}
+                      currentUserId={user?.uid}
+                      receiverLastActive={patientOnlineStatus.lastActive}
                     />
 
                     {message.status !== "unsent" && (
@@ -1090,79 +1099,260 @@ export default function DoctorChatPage() {
 
     return (
       <>
-        <div className="fixed inset-0 z-50 bg-black/50 transition-opacity" onClick={() => setShowPatientInfo(false)} />
-        <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-lg">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-graphite">Patient Information</h2>
-            <button
-              onClick={() => setShowPatientInfo(false)}
-              className="rounded-full p-1 text-drift-gray hover:bg-pale-stone hover:text-soft-amber"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="mt-4 flex items-center">
-            <div className="mr-4 h-16 w-16 overflow-hidden rounded-full bg-pale-stone">
-              <ProfileImage
-                src={patientDetails.photoURL}
-                alt={patientDetails.displayName || "Patient"}
-                fallbackType="patient"
-                className="h-full w-full object-cover"
-              />
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300" 
+          onClick={() => setShowPatientInfo(false)} 
+        />
+        <div className={`fixed z-50 ${isMobile ? 'inset-x-0 bottom-0 w-full max-h-[85vh] rounded-t-3xl' : 'left-1/2 top-1/2 w-full max-w-4xl max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-2xl'} bg-white shadow-2xl overflow-hidden flex flex-col ${isMobile ? 'animate-slide-up' : 'animate-in fade-in-0 zoom-in-95 duration-300'}`}>
+          {/* Drag Handle - Mobile only */}
+          {isMobile && (
+            <div className="flex justify-center pt-2 pb-1">
+              <div className="w-12 h-1.5 bg-drift-gray/30 rounded-full"></div>
             </div>
-            <div>
-              <h3 className="text-lg font-medium text-graphite">{patientDetails.displayName}</h3>
-              {patientDetails.dob && <p className="text-soft-amber">Age: {calculateAge(patientDetails.dob)}</p>}
-            </div>
-          </div>
+          )}
 
-          <div className="mt-4 space-y-3">
-            <div>
-              <h4 className="text-sm font-medium text-drift-gray">Medical History</h4>
-              <p className="text-sm text-graphite">
-                {patientDetails.medicalConditions || "No medical history recorded"}
-              </p>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-drift-gray">Allergies</h4>
-              <p className="text-sm text-graphite">{patientDetails.allergies || "No allergies recorded"}</p>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-drift-gray">Current Medications</h4>
-              {patientDetails.currentMedications ? (
-                <p className="text-sm text-graphite">{patientDetails.currentMedications}</p>
-              ) : (
-                <p className="text-sm text-graphite">No medications recorded</p>
-              )}
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-drift-gray">Contact Information</h4>
-              <p className="text-sm text-graphite">
-                {patientDetails.phone ? `Phone: ${patientDetails.phone}` : "No phone number recorded"}
-              </p>
-              <p className="text-sm text-graphite">
-                {patientDetails.email ? `Email: ${patientDetails.email}` : "No email recorded"}
-              </p>
+          {/* Header - Clean style like Meta modal */}
+          <div className={`${isMobile ? 'bg-white border-b border-pale-stone px-4 py-4' : 'bg-gradient-to-br from-soft-amber/10 to-yellow-50 border-b border-amber-200/50 px-4 sm:px-6 py-4'} flex-shrink-0`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {!isMobile && (
+                  <div className="rounded-xl bg-gradient-to-br from-soft-amber to-amber-500 p-2.5 shadow-lg">
+                    <User className="h-5 w-5 text-white" />
+                  </div>
+                )}
+                <h2 className={`${isMobile ? 'text-xl' : 'text-xl sm:text-2xl'} font-bold text-graphite`}>Patient Information</h2>
+              </div>
             </div>
           </div>
 
-          <div className="mt-6 flex justify-between">
-            <Link
-              href={`/doctor/patients/${patientDetails.id}`}
-              className="rounded-md border border-earth-beige bg-white px-4 py-2 text-sm font-medium text-graphite transition-colors hover:bg-pale-stone"
-            >
-              View Full Profile
-            </Link>
-            <button
-              onClick={() => setShowPatientInfo(false)}
-              className="rounded-md bg-soft-amber px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600"
-            >
-              Close
-            </button>
+          {/* Scrollable Content - Horizontal on desktop, vertical on mobile */}
+          <div className={`flex-1 overflow-y-auto ${isMobile ? 'bg-pale-stone/30' : 'bg-white'} ${isMobile ? 'px-0' : 'p-4 sm:p-6'} scrollbar-hide`}>
+            {isMobile ? (
+              // Mobile: Meta-style Layout
+              <div className="space-y-0">
+                {/* Profile Section - Meta style */}
+                <div className="bg-white px-4 py-5 border-b border-pale-stone">
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-pale-stone ring-2 ring-soft-amber/20">
+                      <ProfileImage
+                        src={patientDetails.photoURL}
+                        alt={patientDetails.displayName || "Patient"}
+                        fallbackType="patient"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-semibold text-graphite truncate">{patientDetails.displayName}</h3>
+                      {patientDetails.dob && (
+                        <p className="text-sm text-drift-gray mt-0.5">Age: {calculateAge(patientDetails.dob)}</p>
+                      )}
+                      {patientOnlineStatus.isOnline && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                          <p className="text-xs text-drift-gray">Online</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Information Cards - Meta style list */}
+                <div className="bg-white">
+                  {/* Medical History */}
+                  <div className="w-full px-4 py-4 flex items-center border-b border-pale-stone">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="rounded-full bg-red-100 p-2.5 flex-shrink-0">
+                        <Heart className="h-5 w-5 text-red-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-graphite">Medical History</h4>
+                        <p className="text-xs text-drift-gray break-words mt-0.5">
+                          {patientDetails.medicalConditions || "No medical history recorded"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Allergies */}
+                  <div className="w-full px-4 py-4 flex items-center border-b border-pale-stone">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="rounded-full bg-orange-100 p-2.5 flex-shrink-0">
+                        <AlertTriangle className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-graphite">Allergies</h4>
+                        <p className="text-xs text-drift-gray break-words mt-0.5">
+                          {patientDetails.allergies || "No allergies recorded"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Current Medications */}
+                  <div className="w-full px-4 py-4 flex items-center border-b border-pale-stone">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="rounded-full bg-blue-100 p-2.5 flex-shrink-0">
+                        <Pill className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-graphite">Current Medications</h4>
+                        <p className="text-xs text-drift-gray break-words mt-0.5">
+                          {patientDetails.currentMedications || "No medications recorded"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div className="w-full px-4 py-4 border-b border-pale-stone">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-full bg-soft-amber/20 p-2.5 flex-shrink-0">
+                        <Info className="h-5 w-5 text-soft-amber" />
+                      </div>
+                      <h4 className="text-sm font-medium text-graphite">Contact Information</h4>
+                    </div>
+                    <div className="space-y-2.5 pl-14">
+                      {patientDetails.phone ? (
+                        <a href={`tel:${patientDetails.phone}`} className="flex items-center gap-2.5 text-sm text-graphite hover:text-soft-amber transition-colors">
+                          <Phone className="h-4 w-4 text-soft-amber flex-shrink-0" />
+                          <span className="break-all">{patientDetails.phone}</span>
+                        </a>
+                      ) : (
+                        <p className="text-xs text-drift-gray italic">No phone number recorded</p>
+                      )}
+                      {patientDetails.email ? (
+                        <a href={`mailto:${patientDetails.email}`} className="flex items-center gap-2.5 text-sm text-graphite hover:text-soft-amber transition-colors">
+                          <Mail className="h-4 w-4 text-soft-amber flex-shrink-0" />
+                          <span className="break-all">{patientDetails.email}</span>
+                        </a>
+                      ) : (
+                        <p className="text-xs text-drift-gray italic">No email recorded</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* View Full Profile Button - Mobile */}
+                <div className="bg-white px-4 py-4 border-t border-pale-stone">
+                  <Link
+                    href={`/doctor/patients/${patientDetails.id}`}
+                    className="w-full rounded-lg bg-soft-amber px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-600 active:bg-amber-700 shadow-sm text-center block"
+                  >
+                    View Full Profile
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              // Desktop: Horizontal Layout
+              <div className="flex gap-6">
+                {/* Left Side - Profile */}
+                <div className="flex-shrink-0 w-64 space-y-4">
+                  <div className="flex flex-col items-center text-center pb-4 border-b border-pale-stone">
+                    <div className="relative h-32 w-32 mb-4 overflow-hidden rounded-full bg-gradient-to-br from-soft-amber/20 to-amber-100 ring-4 ring-soft-amber/20">
+                      <ProfileImage
+                        src={patientDetails.photoURL}
+                        alt={patientDetails.displayName || "Patient"}
+                        fallbackType="patient"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <h3 className="text-xl font-bold text-graphite">{patientDetails.displayName}</h3>
+                    {patientDetails.dob && (
+                      <div className="flex items-center justify-center gap-2 mt-2">
+                        <Calendar className="h-4 w-4 text-soft-amber" />
+                        <p className="text-sm font-medium text-soft-amber">Age: {calculateAge(patientDetails.dob)}</p>
+                      </div>
+                    )}
+                    {patientOnlineStatus.isOnline && (
+                      <div className="flex items-center justify-center gap-2 mt-2">
+                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <p className="text-xs text-drift-gray">Online</p>
+                      </div>
+                    )}
+                  </div>
+                  <Link
+                    href={`/doctor/patients/${patientDetails.id}`}
+                    className="w-full rounded-lg border border-earth-beige bg-white px-4 py-2.5 text-sm font-medium text-graphite transition-all hover:bg-pale-stone hover:border-soft-amber text-center block"
+                  >
+                    View Full Profile
+                  </Link>
+                </div>
+
+                {/* Right Side - Information Cards */}
+                <div className="flex-1 grid grid-cols-2 gap-4">
+                  {/* Medical History */}
+                  <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-red-50/50 to-white p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="rounded-lg bg-red-100 p-2">
+                        <Heart className="h-4 w-4 text-red-600" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-graphite">Medical History</h4>
+                    </div>
+                    <p className="text-sm text-graphite pl-10 break-words">
+                      {patientDetails.medicalConditions || <span className="text-drift-gray italic">No medical history recorded</span>}
+                    </p>
+                  </div>
+
+                  {/* Allergies */}
+                  <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-orange-50/50 to-white p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="rounded-lg bg-orange-100 p-2">
+                        <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-graphite">Allergies</h4>
+                    </div>
+                    <p className="text-sm text-graphite pl-10 break-words">
+                      {patientDetails.allergies || <span className="text-drift-gray italic">No allergies recorded</span>}
+                    </p>
+                  </div>
+
+                  {/* Current Medications */}
+                  <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-blue-50/50 to-white p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="rounded-lg bg-blue-100 p-2">
+                        <Pill className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-graphite">Current Medications</h4>
+                    </div>
+                    <p className="text-sm text-graphite pl-10 break-words">
+                      {patientDetails.currentMedications || <span className="text-drift-gray italic">No medications recorded</span>}
+                    </p>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-amber-50/50 to-white p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="rounded-lg bg-soft-amber/20 p-2">
+                        <Info className="h-4 w-4 text-soft-amber" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-graphite">Contact Information</h4>
+                    </div>
+                    <div className="space-y-2 pl-10">
+                      {patientDetails.phone ? (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-soft-amber flex-shrink-0" />
+                          <a href={`tel:${patientDetails.phone}`} className="text-sm text-graphite hover:text-soft-amber transition-colors break-all">
+                            {patientDetails.phone}
+                          </a>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-drift-gray italic">No phone number recorded</p>
+                      )}
+                      {patientDetails.email ? (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-soft-amber flex-shrink-0" />
+                          <a href={`mailto:${patientDetails.email}`} className="text-sm text-graphite hover:text-soft-amber transition-colors break-all">
+                            {patientDetails.email}
+                          </a>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-drift-gray italic">No email recorded</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </>
@@ -1171,7 +1361,7 @@ export default function DoctorChatPage() {
 
   // Main render
   return (
-    <div className="h-screen w-full">
+    <div className="h-screen w-full scrollbar-hide">
       {isMobile ? (
         // Mobile layout
         <>
@@ -1183,9 +1373,9 @@ export default function DoctorChatPage() {
         </>
       ) : (
         // Desktop layout - full screen with split view
-        <div className="grid h-full w-full grid-cols-[350px_1fr] overflow-hidden">
-          <div className="h-full overflow-hidden">{renderConversationList()}</div>
-          <div className="h-full overflow-hidden">{renderConversationView()}</div>
+        <div className="grid h-full w-full grid-cols-[350px_1fr] overflow-hidden scrollbar-hide">
+          <div className="h-full overflow-hidden scrollbar-hide">{renderConversationList()}</div>
+          <div className="h-full overflow-hidden scrollbar-hide">{renderConversationView()}</div>
         </div>
       )}
 

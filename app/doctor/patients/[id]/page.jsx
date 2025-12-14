@@ -202,21 +202,21 @@ export default function PatientDetailsPage() {
             <div className="flex p-1 bg-amber-100/50 rounded-full shadow-sm">
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 ${
                   activeTab === "profile" ? "bg-amber-500 text-white shadow-sm" : "text-amber-700 hover:text-amber-900"
                 }`}
               >
-                <span className="relative z-10">Patient Profile</span>
+                <span>Patient Profile</span>
               </button>
               <button
                 onClick={() => setActiveTab("appointments")}
-                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 ${
                   activeTab === "appointments"
                     ? "bg-amber-500 text-white shadow-sm"
                     : "text-amber-700 hover:text-amber-900"
                 }`}
               >
-                <span className="relative z-10">Appointment History</span>
+                <span>Appointment History</span>
               </button>
             </div>
           </div>

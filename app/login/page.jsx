@@ -106,18 +106,13 @@ export default function LoginPage() {
       
       const result = await signInWithGoogle()
       
-      // Check if device approval is required
-      if (result && result.requiresDeviceApproval) {
-        // Redirect to waiting approval page
-        router.push(`/device-waiting-approval?uid=${result.user.uid}`)
-        return
-      }
+      // Device approval functionality removed - proceed directly with login
       
       // Wait a bit for auth state to settle
       await new Promise(resolve => setTimeout(resolve, 1000))
       
-      // Only show welcome modal if sign-in was successful
-      if (result && !result.requiresDeviceApproval) {
+      // Show welcome modal if sign-in was successful
+      if (result) {
         console.log("Google login successful, showing welcome modal")
         setShowWelcomeModal(true)
       }
@@ -243,7 +238,6 @@ export default function LoginPage() {
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-soft-amber text-white text-xs">4</span>
-                    <span className="text-sm text-drift-gray flex items-start gap-2"><Shield className="h-4 w-4 text-soft-amber mt-0.5" />New users may see <span className="font-medium text-graphite">Waiting for Approval</span> first.</span>
                   </li>
                 </ol>
                 <div className="mt-4 flex items-center gap-2 text-xs text-drift-gray">

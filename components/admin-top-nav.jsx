@@ -1,7 +1,7 @@
 "use client"
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
-import { Bell, Menu } from "lucide-react"
+import { Bell, Menu, Mail } from "lucide-react"
 import useMobile from "@/hooks/use-mobile"
 import { useAuth } from "@/contexts/auth-context"
 import { LogoutConfirmation } from "@/components/logout-confirmation"
@@ -189,8 +189,17 @@ export function AdminTopNav({ onMenuClick, sidebarCollapsed }) {
           </div>
         </div>
 
-        {/* Right side - notifications only */}
+        {/* Right side - mail and notifications */}
         <div className="flex items-center space-x-1 md:space-x-2">
+          {/* Mail Icon - Contact Form Messages */}
+          <Link
+            href="/admin/messages"
+            className="p-2 rounded-full hover:bg-gray-100 text-gray-600 transition-colors relative"
+            aria-label="Messages"
+            title="View contact form messages"
+          >
+            <Mail className="h-5 w-5" />
+          </Link>
           {/* Notifications */}
           <div className="relative dropdown-container">
             <button

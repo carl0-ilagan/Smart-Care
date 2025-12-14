@@ -36,7 +36,9 @@ import { logFailedLoginAttempt } from "@/lib/security-utils"
 import { createOrUpdateSession } from "@/lib/session-management"
 import { isPWAInstalled } from "@/lib/pwa-utils"
 import { getOrCreateDeviceId, getCompleteDeviceMetadata } from "@/lib/device-utils"
-import { checkDeviceTrust, createLoginRequest, registerTrustedDevice } from "@/lib/device-auth"
+// Device approval functionality removed - not working properly
+// import { checkDeviceTrust, createLoginRequest } from "@/lib/device-auth"
+import { registerTrustedDevice } from "@/lib/device-auth" // Still needed for auto-trusting devices
 
 const AuthContext = createContext({})
 
@@ -478,21 +480,8 @@ export const AuthProvider = ({ children }) => {
         }
       }
       
-      // If not auto-trusted from session history, check explicit device trust
-      if (!deviceTrust.isTrusted && deviceId) {
-        try {
-          deviceTrust = await checkDeviceTrust(user.uid, deviceId)
-          console.log("[Device Auth] Device trust check:", { 
-            deviceId, 
-            isTrusted: deviceTrust.isTrusted,
-            hasExistingSession,
-            userExists: userDoc.exists() 
-          })
-        } catch (deviceError) {
-          console.error("Error checking device trust:", deviceError)
-          // Continue with login even if device check fails
-        }
-      }
+      // Device approval functionality removed - not working properly
+      // Users can now login directly without device approval
 
       let userData
 
@@ -513,130 +502,6 @@ export const AuthProvider = ({ children }) => {
 
         // Update last login timestamp
         updateLastLogin(user.uid)
-
-      // Check if device approval is required (2FA setting)
-      // IMPORTANT: Approval is ONLY required when 2FA is explicitly ON (true)
-      // Default to NOT requiring approval (2FA off by default)
-      let deviceApprovalRequired = false
-      try {
-        const userSettingsRef = doc(db, "userSettings", user.uid)
-        const userSettingsDoc = await getDoc(userSettingsRef)
-        
-        if (userSettingsDoc.exists()) {
-          const userSettings = userSettingsDoc.data()
-          const twoFactorSetting = userSettings.security?.twoFactor
-          
-          // STRICT CHECK: Only require approval if twoFactor is explicitly true
-          // Any other value (false, undefined, null) means 2FA is OFF
-          deviceApprovalRequired = twoFactorSetting === true
-          
-          console.log("[Device Auth] 2FA Setting Check:", {
-            twoFactor: twoFactorSetting,
-            twoFactorType: typeof twoFactorSetting,
-            deviceApprovalRequired,
-            userId: user.uid,
-            message: deviceApprovalRequired ? "2FA ON - Approval required" : "2FA OFF - No approval needed"
-          })
-        } else {
-          // No settings document exists - default to 2FA off (no approval required)
-          console.log("[Device Auth] No userSettings found, defaulting to 2FA OFF (no approval required)")
-          deviceApprovalRequired = false
-        }
-      } catch (settingsError) {
-        console.error("[Device Auth] Error checking user settings:", settingsError)
-        // Default to NOT requiring approval if settings check fails
-        deviceApprovalRequired = false
-        console.log("[Device Auth] Defaulting to 2FA OFF due to error (no approval required)")
-      }
-
-      // Check device trust for existing users
-      // Re-check device trust after user document is confirmed to exist
-      if (deviceId) {
-        try {
-          const recheckTrust = await checkDeviceTrust(user.uid, deviceId)
-          deviceTrust = recheckTrust
-          console.log("[Device Auth] Re-checked device trust:", { deviceId, isTrusted: deviceTrust.isTrusted })
-        } catch (recheckError) {
-          console.error("Error re-checking device trust:", recheckError)
-        }
-      }
-
-      // Only require device approval if:
-      // 1. 2FA is explicitly ON (deviceApprovalRequired === true)
-      // 2. Device is not trusted
-      // 3. Device ID exists
-      if (deviceApprovalRequired === true && !deviceTrust.isTrusted && deviceId) {
-        console.log("[Device Auth] 2FA is ON - Device approval required (device not trusted), creating login request")
-        try {
-          // Create login request for untrusted device
-          const requestResult = await createLoginRequest(
-            user.uid,
-            user.email,
-            deviceId,
-            deviceMetadata,
-            ipAddress
-          )
-
-          if (requestResult.success) {
-            // Send approval email
-            try {
-              await fetch("/api/device-auth/send-approval-email", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  userId: user.uid,
-                  email: user.email,
-                  deviceId: deviceId,
-                  requestId: requestResult.requestId,
-                  deviceMetadata: deviceMetadata,
-                  ipAddress: ipAddress,
-                }),
-              })
-              console.log("[Device Auth] Approval email sent")
-            } catch (emailError) {
-              console.error("Error sending approval email:", emailError)
-            }
-
-            // Return special indicator that device needs approval
-            return { 
-              user, 
-              requiresDeviceApproval: true,
-              requestId: requestResult.requestId,
-            }
-          }
-        } catch (requestError) {
-          console.error("Error creating login request:", requestError)
-          // Continue with normal login if device approval fails
-        }
-      } else {
-        // No approval required - either device is trusted OR 2FA is OFF
-        if (deviceTrust.isTrusted && deviceId) {
-          // Device is already trusted - allow login
-          console.log("[Device Auth] Device is trusted, proceeding with login")
-          try {
-            // Update last used timestamp for trusted device
-            const deviceRef = doc(db, "users", user.uid, "devices", deviceId)
-            await updateDoc(deviceRef, {
-              lastUsed: serverTimestamp(),
-            })
-          } catch (deviceUpdateError) {
-            console.error("Error updating device last used:", deviceUpdateError)
-            // Continue with login even if device update fails
-          }
-        } else if (deviceApprovalRequired === false && deviceId) {
-          // 2FA is OFF - auto-trust this device and allow login
-          console.log("[Device Auth] 2FA is OFF - auto-trusting device and allowing login (no approval needed)")
-          try {
-            await registerTrustedDevice(user.uid, deviceId, deviceMetadata, ipAddress)
-          } catch (autoTrustError) {
-            console.error("Error auto-trusting device:", autoTrustError)
-            // Continue with login even if auto-trust fails
-          }
-        } else {
-          // No device ID or other case - allow login anyway
-          console.log("[Device Auth] Allowing login (no device ID or other case)")
-        }
-      }
 
       // Create or update session
       const sessionInfo = await createOrUpdateSession(user.uid, user.email)
@@ -684,11 +549,14 @@ export const AuthProvider = ({ children }) => {
   }
 
   // Update the logout function to clean up sessions
+  // IMPORTANT: In PWA mode, logout is prevented unless explicitly forced
+  // This ensures users stay logged in when using the installed PWA app
   const logout = async (force = false) => {
     try {
       // Check if running as PWA - prevent logout unless forced
+      // PWA users should stay logged in for better UX (like native apps)
       if (!force && typeof window !== "undefined" && isPWAInstalled()) {
-        console.log("[Auth] Logout prevented - running as PWA")
+        console.log("[Auth] Logout prevented - running as PWA. Use force=true to logout.")
         // Return a special indicator that logout was prevented
         return { prevented: true, reason: "PWA_MODE" }
       }

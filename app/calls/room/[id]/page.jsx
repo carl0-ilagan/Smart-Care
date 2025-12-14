@@ -187,12 +187,12 @@ export default function RoomPage({ params }) {
 
         // Check if room exists and is active - if not, redirect away
         if (!callSnap.exists()) {
-          console.log("❌ Room does not exist, redirecting...")
+          console.log("❌ Room does not exist, redirecting to dashboard...")
           if (typeof window !== "undefined") {
             if (userRole === "doctor") {
-              window.location.href = "/doctor/appointments?toast=room_ended_doctor"
+              window.location.href = "/doctor/dashboard"
             } else {
-              window.location.href = "/dashboard/appointments?toast=room_ended_by_doctor"
+              window.location.href = "/dashboard"
             }
           }
           return
@@ -200,14 +200,14 @@ export default function RoomPage({ params }) {
 
         const callData = callSnap.data() || {}
         
-        // Check if room is ended or inactive - redirect if so
+        // Check if room is ended or inactive - redirect to dashboard if so (prevent joining)
         if (callData.status === "ended" || callData.status === "cancelled" || callData.status === "closed" || callData.revokedBy) {
-          console.log("❌ Room is ended/inactive, redirecting...")
+          console.log("❌ Room is ended/inactive, cannot join. Redirecting to dashboard...")
           if (typeof window !== "undefined") {
             if (userRole === "doctor") {
-              window.location.href = "/doctor/appointments?toast=room_ended_doctor"
+              window.location.href = "/doctor/dashboard"
             } else {
-              window.location.href = "/dashboard/appointments?toast=room_ended_by_doctor"
+              window.location.href = "/dashboard"
             }
           }
           return
@@ -217,9 +217,9 @@ export default function RoomPage({ params }) {
         if (userRole === "patient") {
           // Check if patient is the intended receiver
           if (callData.receiverId && callData.receiverId !== user?.uid) {
-            console.log("❌ Patient not authorized for this room, redirecting...")
+            console.log("❌ Patient not authorized for this room, redirecting to dashboard...")
             if (typeof window !== "undefined") {
-              window.location.href = "/dashboard/appointments"
+              window.location.href = "/dashboard"
             }
             return
           }
@@ -232,10 +232,19 @@ export default function RoomPage({ params }) {
         // Update participants list if user is not already in it (only if room still active)
         const participants = callData.participants || []
         if (!participants.includes(user?.uid)) {
-          // Re-validate active status prior to joining
-          if (!(callData.status === "pending" || callData.status === "active")) {
+          // Re-validate active status prior to joining - prevent joining if ended
+          if (callData.status === "ended" || callData.status === "cancelled" || callData.status === "closed" || callData.revokedBy) {
+            console.log("❌ Cannot join: Room is ended. Redirecting to dashboard...")
             if (typeof window !== "undefined") {
-              window.location.href = userRole === "doctor" ? "/doctor/appointments" : "/dashboard/appointments"
+              window.location.href = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+            }
+            return
+          }
+          // Only allow joining if status is pending or active
+          if (!(callData.status === "pending" || callData.status === "active")) {
+            console.log("❌ Cannot join: Room is not in joinable state. Redirecting to dashboard...")
+            if (typeof window !== "undefined") {
+              window.location.href = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
             }
             return
           }
@@ -255,10 +264,11 @@ export default function RoomPage({ params }) {
         // Offer/Answer flow - ensure proper state checking
         const current = await getDoc(callRef)
         const data = current.data() || {}
-        // Abort negotiation if room was revoked/ended in the meantime
+        // Abort negotiation if room was revoked/ended in the meantime - prevent joining
         if (!current.exists() || data.status === "ended" || data.status === "cancelled" || data.status === "closed" || data.revokedBy) {
+          console.log("❌ Cannot proceed: Room was ended. Redirecting to dashboard...")
           if (typeof window !== "undefined") {
-            window.location.href = userRole === "doctor" ? "/doctor/appointments" : "/dashboard/appointments"
+            window.location.href = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
           }
           return
         }
@@ -322,23 +332,23 @@ export default function RoomPage({ params }) {
         unsubCall = onSnapshot(callRef, async (snap) => {
           const d = snap.data()
           if (!d) {
-            // Room deleted - redirect
-            console.log("❌ Room was deleted, redirecting...")
+            // Room deleted - redirect to dashboard
+            console.log("❌ Room was deleted, redirecting to dashboard...")
             try { if (pcRef.current) pcRef.current.close() } catch {}
             try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t)=>t.stop()) } catch {}
             if (typeof window !== "undefined") {
-              window.location.assign(userRole === "doctor" ? "/doctor/appointments" : "/dashboard/appointments")
+              window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
             }
             return
           }
 
-          // Check if room was ended - redirect if so
+          // Check if room was ended - redirect to dashboard if so
           if (d.status === "ended" || d.status === "cancelled" || d.status === "closed") {
-            console.log("❌ Room was ended, redirecting...")
+            console.log("❌ Room was ended, redirecting to dashboard...")
             try { if (pcRef.current) pcRef.current.close() } catch {}
             try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t)=>t.stop()) } catch {}
             if (typeof window !== "undefined") {
-              window.location.assign(userRole === "doctor" ? "/doctor/appointments" : "/dashboard/appointments")
+              window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
             }
             return
           }
@@ -459,9 +469,11 @@ export default function RoomPage({ params }) {
             // Ignore our own candidates
             if (data.from === (user?.uid || "anon")) return
             try {
-              await pcRef.current.addIceCandidate(new RTCIceCandidate(data))
+              if (pcRef.current && data) {
+                await pcRef.current.addIceCandidate(new RTCIceCandidate(data))
+              }
             } catch (e) {
-              // no-op
+              // no-op - candidate might be invalid or connection closed
             }
           })
         })
@@ -625,7 +637,8 @@ export default function RoomPage({ params }) {
       try { if (pcRef.current) pcRef.current.close() } catch {}
       try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop()) } catch {}
       if (typeof window !== "undefined") {
-        window.location.assign(userRole === "doctor" ? "/doctor/appointments?toast=room_ended_doctor" : "/dashboard/appointments?toast=room_ended_by_doctor")
+        // Redirect both doctor and patient to their respective dashboards when call is ended
+        window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
       }
     }
   }

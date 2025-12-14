@@ -304,7 +304,7 @@ export function NotificationDropdown() {
 
   if (loading) {
     return (
-      <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-md border border-pale-stone bg-white p-4 shadow-lg">
+      <div className="absolute right-0 mt-2 w-80 sm:w-80 max-w-[calc(100vw-2rem)] origin-top-right rounded-md border border-pale-stone bg-white p-4 shadow-lg z-50">
         <div className="flex justify-center">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-soft-amber border-t-transparent"></div>
         </div>
@@ -341,25 +341,25 @@ export function NotificationDropdown() {
   }
 
   return (
-    <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-md border border-pale-stone bg-white shadow-lg z-50">
+    <div className="absolute right-0 mt-2 w-80 sm:w-80 max-w-[calc(100vw-2rem)] origin-top-right rounded-md border border-pale-stone bg-white shadow-lg z-50">
       <div className="p-2 bg-white">
-        <div className="flex items-center justify-between border-b border-pale-stone pb-2">
+        <div className="flex items-center justify-between border-b border-pale-stone pb-2 px-1">
           <h3 className="text-sm font-bold text-graphite">Notifications</h3>
           {unreadCount > 0 && (
-            <button onClick={markAllAsRead} className="text-xs font-medium text-soft-amber hover:underline">
+            <button onClick={markAllAsRead} className="text-xs font-medium text-soft-amber hover:underline whitespace-nowrap">
               Mark all as read
             </button>
           )}
         </div>
 
-        <div className="max-h-96 overflow-y-auto">
+        <div className="max-h-96 overflow-y-auto scrollbar-hide">
           {Array.isArray(notifications) && notifications.length > 0 ? (
             <div className="divide-y divide-pale-stone">
               {notifications.map((notification) => (
                 <Link
                   key={notification.id}
                   href={getNotificationLink(notification)}
-                  className={`block p-3 transition-colors hover:bg-pale-stone ${!notification.read ? "bg-soft-amber/5" : ""}`}
+                  className={`block p-2 sm:p-3 transition-colors hover:bg-pale-stone ${!notification.read ? "bg-soft-amber/5" : ""}`}
                   onClick={(e) => {
                     if (notification.type === "call_invite") {
                       handleCallInviteClick(notification, e)
@@ -369,8 +369,8 @@ export function NotificationDropdown() {
                     }
                   }}
                 >
-                  <div className="flex">
-                    <div className="flex-shrink-0 mr-3">
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="flex-shrink-0">
                       {(() => {
                         // Get imageUrl from notification or metadata
                         const imageUrl = notification.imageUrl || notification.metadata?.patientPhotoURL || notification.metadata?.doctorPhotoURL
@@ -379,7 +379,7 @@ export function NotificationDropdown() {
                           <img
                             src={imageUrl}
                             alt={notification.title || "User"}
-                            className="h-10 w-10 rounded-full object-cover border-2 border-soft-amber/30"
+                            className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover border-2 border-soft-amber/30"
                             onError={(e) => {
                               // Fallback to icon if image fails to load
                               e.target.style.display = "none"
@@ -393,7 +393,7 @@ export function NotificationDropdown() {
                       })()}
                       <div
                         className={`rounded-full ${
-                          (notification.imageUrl || notification.metadata?.patientPhotoURL || notification.metadata?.doctorPhotoURL) ? "hidden" : "p-2"
+                          (notification.imageUrl || notification.metadata?.patientPhotoURL || notification.metadata?.doctorPhotoURL) ? "hidden" : "p-1.5 sm:p-2"
                         } ${
                           notification.type === "appointment"
                             ? "bg-soft-amber/20"
@@ -412,15 +412,15 @@ export function NotificationDropdown() {
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-graphite line-clamp-1">{notification.title}</p>
-                      <p className="text-xs text-drift-gray line-clamp-2">{notification.message}</p>
+                      <p className="text-xs sm:text-sm font-medium text-graphite line-clamp-1">{notification.title}</p>
+                      <p className="text-xs text-drift-gray line-clamp-2 mt-0.5">{notification.message}</p>
                       <p className="mt-1 text-xs text-drift-gray flex items-center">
-                        <Clock className="mr-1 h-3 w-3" />
-                        {notification.time}
+                        <Clock className="mr-1 h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{notification.time}</span>
                       </p>
                     </div>
                     {!notification.read && (
-                      <div className="ml-2 flex-shrink-0">
+                      <div className="ml-1 sm:ml-2 flex-shrink-0 mt-1">
                         <div className="h-2 w-2 rounded-full bg-soft-amber"></div>
                       </div>
                     )}
@@ -429,9 +429,9 @@ export function NotificationDropdown() {
               ))}
             </div>
           ) : (
-            <div className="py-6 flex flex-col items-center justify-center">
+            <div className="py-4 sm:py-6 flex flex-col items-center justify-center">
               <NoNotificationsAnimation />
-              <p className="mt-2 text-sm text-drift-gray">No notifications</p>
+              <p className="mt-2 text-xs sm:text-sm text-drift-gray">No notifications</p>
             </div>
           )}
         </div>
@@ -439,7 +439,7 @@ export function NotificationDropdown() {
         <div className="border-t border-pale-stone pt-2 mt-1">
           <Link
             href={isDoctor ? "/doctor/notifications" : "/dashboard/notifications"}
-            className="block text-center text-xs font-medium text-soft-amber hover:underline py-1"
+            className="block text-center text-xs font-medium text-soft-amber hover:underline py-1.5 sm:py-2"
           >
             View all notifications
           </Link>

@@ -15,6 +15,12 @@ import {
   Loader2,
   ArrowUp,
   BellOff,
+  Phone,
+  Mail,
+  GraduationCap,
+  Briefcase,
+  Globe,
+  Stethoscope,
 } from "lucide-react"
 import { useMobile } from "@/hooks/use-mobile"
 import Link from "next/link"
@@ -959,6 +965,8 @@ export default function MessagesPage() {
                       currentUserName={user?.displayName}
                       patientDetails={user}
                       doctorDetails={doctorDetails}
+                      currentUserId={user?.uid}
+                      receiverLastActive={doctorOnlineStatus.lastActive}
                     />
 
                     {message.status !== "unsent" && (
@@ -1060,69 +1068,270 @@ export default function MessagesPage() {
 
     return (
       <>
-        <div className="fixed inset-0 z-50 bg-black/50 transition-opacity" onClick={() => setShowDoctorInfo(false)} />
-        <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-lg">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-graphite">Doctor Information</h2>
-            <button
-              onClick={() => setShowDoctorInfo(false)}
-              className="rounded-full p-1 text-drift-gray hover:bg-pale-stone hover:text-soft-amber"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="mt-4 flex items-center">
-            <div className="mr-4 h-16 w-16 overflow-hidden rounded-full bg-pale-stone">
-              {doctorDetails.photoURL ? (
-                <img
-                  src={doctorDetails.photoURL || "/placeholder.svg"}
-                  alt={doctorDetails.displayName}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <User className="h-full w-full p-3 text-drift-gray" />
-              )}
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300" 
+          onClick={() => setShowDoctorInfo(false)} 
+        />
+        <div className={`fixed z-50 ${isMobile ? 'inset-x-0 bottom-0 w-full max-h-[85vh] rounded-t-3xl' : 'left-1/2 top-1/2 w-full max-w-4xl max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-2xl'} bg-white shadow-2xl overflow-hidden flex flex-col ${isMobile ? 'animate-slide-up' : 'animate-in fade-in-0 zoom-in-95 duration-300'}`}>
+          {/* Drag Handle - Mobile only */}
+          {isMobile && (
+            <div className="flex justify-center pt-2 pb-1">
+              <div className="w-12 h-1.5 bg-drift-gray/30 rounded-full"></div>
             </div>
-            <div>
-              <h3 className="text-lg font-medium text-graphite">{doctorDetails.displayName}</h3>
-              <p className="text-soft-amber">{doctorDetails.specialty}</p>
-            </div>
-          </div>
+          )}
 
-          <div className="mt-4 space-y-3">
-            <div>
-              <h4 className="text-sm font-medium text-drift-gray">About</h4>
-              <p className="text-sm text-graphite">{doctorDetails.bio || "No bio available"}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <h4 className="text-sm font-medium text-drift-gray">Education</h4>
-                <p className="text-sm text-graphite">{doctorDetails.education || "Not specified"}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-drift-gray">Experience</h4>
-                <p className="text-sm text-graphite">{doctorDetails.experience || "Not specified"}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-drift-gray">Languages</h4>
-                <p className="text-sm text-graphite">{doctorDetails.languages || "Not specified"}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-drift-gray">Contact</h4>
-                <p className="text-sm text-graphite">{doctorDetails.phone || "Not available"}</p>
+          {/* Header - Clean style like Meta modal */}
+          <div className={`${isMobile ? 'bg-white border-b border-pale-stone px-4 py-4' : 'bg-gradient-to-br from-soft-amber/10 to-yellow-50 border-b border-amber-200/50 px-4 sm:px-6 py-4'} flex-shrink-0`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {!isMobile && (
+                  <div className="rounded-xl bg-gradient-to-br from-soft-amber to-amber-500 p-2.5 shadow-lg">
+                    <Stethoscope className="h-5 w-5 text-white" />
+                  </div>
+                )}
+                <h2 className={`${isMobile ? 'text-xl' : 'text-xl sm:text-2xl'} font-bold text-graphite`}>Doctor Information</h2>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end">
-            <button
-              onClick={() => setShowDoctorInfo(false)}
-              className="rounded-md bg-soft-amber px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-600"
-            >
-              Close
-            </button>
+          {/* Scrollable Content - Horizontal on desktop, vertical on mobile */}
+          <div className={`flex-1 overflow-y-auto ${isMobile ? 'bg-pale-stone/30' : 'bg-white'} ${isMobile ? 'px-0' : 'p-4 sm:p-6'} scrollbar-hide`}>
+            {isMobile ? (
+              // Mobile: Meta-style Layout
+              <div className="space-y-0">
+                {/* Profile Section - Meta style */}
+                <div className="bg-white px-4 py-5 border-b border-pale-stone">
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-pale-stone ring-2 ring-soft-amber/20">
+                      <ProfileImage
+                        src={doctorDetails.photoURL}
+                        alt={doctorDetails.displayName || "Doctor"}
+                        className="h-full w-full object-cover"
+                        role="doctor"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-semibold text-graphite truncate">{doctorDetails.displayName}</h3>
+                      {doctorDetails.specialty && (
+                        <p className="text-sm text-drift-gray mt-0.5">{doctorDetails.specialty}</p>
+                      )}
+                      {doctorOnlineStatus.isOnline && (
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                          <p className="text-xs text-drift-gray">Online</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Information Cards - Meta style list */}
+                <div className="bg-white">
+                  {/* About/Bio */}
+                  {doctorDetails.bio && (
+                    <div className="w-full px-4 py-4 flex items-center border-b border-pale-stone">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="rounded-full bg-blue-100 p-2.5 flex-shrink-0">
+                          <Info className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-medium text-graphite">About</h4>
+                          <p className="text-xs text-drift-gray break-words mt-0.5">
+                            {doctorDetails.bio}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Education */}
+                  <div className="w-full px-4 py-4 flex items-center border-b border-pale-stone">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="rounded-full bg-purple-100 p-2.5 flex-shrink-0">
+                        <GraduationCap className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-graphite">Education</h4>
+                        <p className="text-xs text-drift-gray break-words mt-0.5">
+                          {doctorDetails.education || "Not specified"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Experience */}
+                  <div className="w-full px-4 py-4 flex items-center border-b border-pale-stone">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="rounded-full bg-green-100 p-2.5 flex-shrink-0">
+                        <Briefcase className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-graphite">Experience</h4>
+                        <p className="text-xs text-drift-gray break-words mt-0.5">
+                          {doctorDetails.experience || "Not specified"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Languages */}
+                  <div className="w-full px-4 py-4 flex items-center border-b border-pale-stone">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="rounded-full bg-indigo-100 p-2.5 flex-shrink-0">
+                        <Globe className="h-5 w-5 text-indigo-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-graphite">Languages</h4>
+                        <p className="text-xs text-drift-gray break-words mt-0.5">
+                          {doctorDetails.languages || "Not specified"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div className="w-full px-4 py-4 border-b border-pale-stone">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="rounded-full bg-soft-amber/20 p-2.5 flex-shrink-0">
+                        <Phone className="h-5 w-5 text-soft-amber" />
+                      </div>
+                      <h4 className="text-sm font-medium text-graphite">Contact</h4>
+                    </div>
+                    <div className="space-y-2.5 pl-14">
+                      {doctorDetails.phone ? (
+                        <a href={`tel:${doctorDetails.phone}`} className="flex items-center gap-2.5 text-sm text-graphite hover:text-soft-amber transition-colors">
+                          <Phone className="h-4 w-4 text-soft-amber flex-shrink-0" />
+                          <span className="break-all">{doctorDetails.phone}</span>
+                        </a>
+                      ) : (
+                        <p className="text-xs text-drift-gray italic">Not available</p>
+                      )}
+                      {doctorDetails.email && (
+                        <a href={`mailto:${doctorDetails.email}`} className="flex items-center gap-2.5 text-sm text-graphite hover:text-soft-amber transition-colors">
+                          <Mail className="h-4 w-4 text-soft-amber flex-shrink-0" />
+                          <span className="break-all">{doctorDetails.email}</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Desktop: Horizontal Layout
+              <div className="flex gap-6">
+                {/* Left Side - Profile */}
+                <div className="flex-shrink-0 w-64 space-y-4">
+                  <div className="flex flex-col items-center text-center pb-4 border-b border-pale-stone">
+                    <div className="relative h-32 w-32 mb-4 overflow-hidden rounded-full bg-gradient-to-br from-soft-amber/20 to-amber-100 ring-4 ring-soft-amber/20">
+                      <ProfileImage
+                        src={doctorDetails.photoURL}
+                        alt={doctorDetails.displayName || "Doctor"}
+                        className="h-full w-full object-cover"
+                        role="doctor"
+                      />
+                    </div>
+                    <h3 className="text-xl font-bold text-graphite">{doctorDetails.displayName}</h3>
+                    {doctorDetails.specialty && (
+                      <div className="flex items-center justify-center gap-2 mt-2">
+                        <Stethoscope className="h-4 w-4 text-soft-amber" />
+                        <p className="text-sm font-medium text-soft-amber">{doctorDetails.specialty}</p>
+                      </div>
+                    )}
+                    {doctorOnlineStatus.isOnline && (
+                      <div className="flex items-center justify-center gap-2 mt-2">
+                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></span>
+                        <p className="text-xs text-drift-gray">Online</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right Side - Information Cards */}
+                <div className="flex-1 grid grid-cols-2 gap-4">
+                  {/* About/Bio */}
+                  {doctorDetails.bio && (
+                    <div className="col-span-2 rounded-xl border border-amber-200/50 bg-gradient-to-br from-blue-50/50 to-white p-4 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="rounded-lg bg-blue-100 p-2">
+                          <Info className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-graphite">About</h4>
+                      </div>
+                      <p className="text-sm text-graphite pl-10 break-words">{doctorDetails.bio}</p>
+                    </div>
+                  )}
+
+                  {/* Education */}
+                  <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-purple-50/50 to-white p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="rounded-lg bg-purple-100 p-2">
+                        <GraduationCap className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-graphite">Education</h4>
+                    </div>
+                    <p className="text-sm text-graphite pl-10 break-words">
+                      {doctorDetails.education || <span className="text-drift-gray italic">Not specified</span>}
+                    </p>
+                  </div>
+
+                  {/* Experience */}
+                  <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-green-50/50 to-white p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="rounded-lg bg-green-100 p-2">
+                        <Briefcase className="h-4 w-4 text-green-600" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-graphite">Experience</h4>
+                    </div>
+                    <p className="text-sm text-graphite pl-10 break-words">
+                      {doctorDetails.experience || <span className="text-drift-gray italic">Not specified</span>}
+                    </p>
+                  </div>
+
+                  {/* Languages */}
+                  <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-indigo-50/50 to-white p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="rounded-lg bg-indigo-100 p-2">
+                        <Globe className="h-4 w-4 text-indigo-600" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-graphite">Languages</h4>
+                    </div>
+                    <p className="text-sm text-graphite pl-10 break-words">
+                      {doctorDetails.languages || <span className="text-drift-gray italic">Not specified</span>}
+                    </p>
+                  </div>
+
+                  {/* Contact Information */}
+                  <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-amber-50/50 to-white p-4 shadow-sm">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="rounded-lg bg-soft-amber/20 p-2">
+                        <Phone className="h-4 w-4 text-soft-amber" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-graphite">Contact</h4>
+                    </div>
+                    <div className="space-y-2 pl-10">
+                      {doctorDetails.phone ? (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-soft-amber flex-shrink-0" />
+                          <a href={`tel:${doctorDetails.phone}`} className="text-sm text-graphite hover:text-soft-amber transition-colors break-all">
+                            {doctorDetails.phone}
+                          </a>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-drift-gray italic">Not available</p>
+                      )}
+                      {doctorDetails.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-soft-amber flex-shrink-0" />
+                          <a href={`mailto:${doctorDetails.email}`} className="text-sm text-graphite hover:text-soft-amber transition-colors break-all">
+                            {doctorDetails.email}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </>

@@ -704,40 +704,43 @@ export default function AdminDoctorDetailsPage() {
             <div className="flex p-1 bg-earth-beige/20 rounded-full shadow-sm">
               <button
                 onClick={() => setActiveTab("profile")}
-                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-1.5 ${
                   activeTab === "profile" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
                 }`}
               >
-                <span className="relative z-10 flex items-center">
-                  <User className="h-4 w-4 mr-1.5" />
-                  Profile
-                </span>
+                <User className="h-4 w-4" />
+                <span>Profile</span>
               </button>
               <button
                 onClick={() => setActiveTab("schedule")}
-                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-1.5 ${
                   activeTab === "schedule"
                     ? "bg-soft-amber text-white shadow-sm"
                     : "text-drift-gray hover:text-graphite"
                 }`}
               >
-                <span className="relative z-10 flex items-center">
-                  <CalendarDays className="h-4 w-4 mr-1.5" />
-                  Schedule
-                </span>
+                <CalendarDays className="h-4 w-4" />
+                <span>Schedule</span>
               </button>
               <button
                 onClick={() => setActiveTab("patients")}
-                className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+                className={`relative px-5 py-2.5 pr-7 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-2 ${
                   activeTab === "patients"
                     ? "bg-soft-amber text-white shadow-sm"
                     : "text-drift-gray hover:text-graphite"
                 }`}
               >
-                <span className="relative z-10 flex items-center">
-                  <Users className="h-4 w-4 mr-1.5" />
-                  Patients ({stats.totalPatients || 0})
-                </span>
+                <Users className="h-4 w-4" />
+                <span>Patients</span>
+                {(stats.totalPatients || 0) > 0 && (
+                  <span className={`inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-xs font-semibold ${
+                    activeTab === "patients" 
+                      ? "bg-white/20 text-white border border-white/30" 
+                      : "bg-soft-amber text-white"
+                  }`}>
+                    {stats.totalPatients || 0}
+                  </span>
+                )}
               </button>
               </div>
             </div>

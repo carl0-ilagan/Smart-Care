@@ -332,6 +332,43 @@
         allow write: if true; // For now, allow all writes to this collection
       }
 
+      // --- TESTIMONIALS (published, globally visible) ---
+      match /testimonials/{testimonialId} {
+        // Everyone can read published testimonials
+        allow read: if true;
+        // Allow any signed-in user to create a testimonial (no rating required)
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0;
+        // Allow owners to edit/delete their own testimonial; admins can also manage
+        // For update: user must own the testimonial (userId matches) and cannot change userId
+        allow update: if isSignedIn() && (
+          (resource.data.userId == request.auth.uid && 
+           request.resource.data.userId == resource.data.userId) ||
+          isAdmin()
+        );
+        allow delete: if (isSignedIn() && request.auth.uid == resource.data.userId) || isAdmin();
+      }
+
+      // --- TESTIMONIAL SUBMISSIONS (pending review) ---
+      match /testimonials_submissions/{submissionId} {
+        // Users can submit their own testimonial
+        allow create: if isSignedIn()
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.rating is number
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0;
+
+        // Optional: allow users to read their own submission status
+        allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+
+        // Updates/deletes restricted to admins
+        allow update, delete: if isAdmin();
+      }
+
       // Sessions collection
       match /sessions/{sessionId} {
         // Allow read if signed in and owns the session
@@ -368,6 +405,18 @@
         allow read: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
         allow create: if isSignedIn();
         allow update, delete: if isAdmin();
+      }
+
+      // --- CONTACT MESSAGES ---
+      match /contact_messages/{messageId} {
+        // Allow read for admins only
+        allow read: if isAdmin();
+        // Allow create for anyone (contact form submissions)
+        allow create: if true;
+        // Allow update for admins only (mark as read, star, etc.)
+        allow update: if isAdmin();
+        // Allow delete for admins only
+        allow delete: if isAdmin();
       }
 
       // --- ADMIN ACCESS TO EVERYTHING ---

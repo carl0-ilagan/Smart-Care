@@ -17,7 +17,6 @@ export default function SessionTimeoutListener({ userId }) {
   const [timeoutMs, setTimeoutMs] = useState(Infinity)
   const timerRef = useRef(null)
   const lastActivityRef = useRef(Date.now())
-  const pwaRef = useRef(isPWAInstalled())
 
   // Load user session timeout setting
   useEffect(() => {
@@ -56,13 +55,27 @@ export default function SessionTimeoutListener({ userId }) {
   }, [userId])
 
   // Heartbeat check to auto-logout when not in use
+  // IMPORTANT: PWA mode disables session timeout - users stay logged in
   useEffect(() => {
     if (!userId) return
-    if (pwaRef.current) return // PWA stays logged in until user logs out
+    
+    // Check if PWA is installed - if so, disable session timeout completely
+    if (isPWAInstalled()) {
+      console.log('[Session Timeout] PWA mode detected - session timeout disabled')
+      return // PWA stays logged in until user explicitly logs out
+    }
+    
     if (!isFinite(timeoutMs)) return
 
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = setInterval(async () => {
+      // Double-check PWA status on each interval (in case PWA was installed during session)
+      if (isPWAInstalled()) {
+        console.log('[Session Timeout] PWA mode detected during check - clearing timeout')
+        clearInterval(timerRef.current)
+        return
+      }
+      
       const now = Date.now()
       const idleFor = now - lastActivityRef.current
       if (idleFor >= timeoutMs) {

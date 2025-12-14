@@ -228,7 +228,6 @@ export function LoginModal({ isOpen, onClose, onSwitchToSignup }) {
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-soft-amber text-white text-xs">4</span>
-                  <span className="text-sm text-drift-gray flex items-start gap-2"><Shield className="h-4 w-4 text-soft-amber mt-0.5" />New users may see <span className="font-medium text-graphite">Waiting for Approval</span> first.</span>
                 </li>
               </ol>
               <div className="mt-4 flex items-center gap-2 text-xs text-drift-gray">

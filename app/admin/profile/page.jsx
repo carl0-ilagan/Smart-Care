@@ -635,42 +635,36 @@ export default function AdminProfilePage() {
         <div className="flex p-1 bg-earth-beige/20 rounded-full shadow-sm">
           <button
             onClick={() => setActiveTab("profile")}
-            className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+            className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-1.5 ${
               activeTab === "profile" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
             }`}
             aria-selected={activeTab === "profile"}
             role="tab"
           >
-            <span className="relative z-10 flex items-center">
-              <UserCircle className="h-4 w-4 mr-1.5" />
-              Profile
-            </span>
+            <UserCircle className="h-4 w-4" />
+            <span>Profile</span>
           </button>
           <button
             onClick={() => setActiveTab("security")}
-            className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+            className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-1.5 ${
               activeTab === "security" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
             }`}
             aria-selected={activeTab === "security"}
             role="tab"
           >
-            <span className="relative z-10 flex items-center">
-              <Lock className="h-4 w-4 mr-1.5" />
-              Security
-            </span>
+            <Lock className="h-4 w-4" />
+            <span>Security</span>
           </button>
           <button
             onClick={() => setActiveTab("preferences")}
-            className={`relative px-4 py-2 text-sm font-medium rounded-full transition-all duration-200 ${
+            className={`relative px-5 py-2.5 text-sm font-medium rounded-full transition-all duration-200 flex items-center gap-1.5 ${
               activeTab === "preferences" ? "bg-soft-amber text-white shadow-sm" : "text-drift-gray hover:text-graphite"
             }`}
             aria-selected={activeTab === "preferences"}
             role="tab"
           >
-            <span className="relative z-10 flex items-center">
-              <Settings className="h-4 w-4 mr-1.5" />
-              Preferences
-            </span>
+            <Settings className="h-4 w-4" />
+            <span>Preferences</span>
           </button>
         </div>
       </div>

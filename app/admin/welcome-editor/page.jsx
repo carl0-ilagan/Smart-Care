@@ -53,6 +53,7 @@ export default function WelcomeEditorPage() {
         address: "123 Healthcare Avenue, Medical District, CA 90210",
         phone: "+1 (555) 123-4567",
         email: "contact@smartcare.com",
+        mapUrl: "",
       },
       footer: {
         description:
@@ -335,13 +336,25 @@ export default function WelcomeEditorPage() {
 
     try {
       const imageUrl = await uploadLandingPageImage(file, section)
-      setLandingContent((prev) => ({
-        ...prev,
-        [section]: {
-          ...prev[section],
-          imageUrl,
-        },
-      }))
+      let updatedContent
+      setLandingContent((prev) => {
+        updatedContent = {
+          ...prev,
+          [section]: {
+            ...prev[section],
+            imageUrl,
+          },
+        }
+        return updatedContent
+      })
+
+      // Auto-save image uploads to Firestore for real-time updates
+      try {
+        await updateLandingPageContent(updatedContent)
+      } catch (saveError) {
+        console.error("Error auto-saving image:", saveError)
+        // Don't show error to user, just log it
+      }
 
       showNotification("Image uploaded successfully")
     } catch (error) {
@@ -371,13 +384,26 @@ export default function WelcomeEditorPage() {
 
     try {
       const imageUrl = await uploadLandingPageImage(file, `branding-${field}`)
-      setLandingContent((prev) => ({
-        ...prev,
-        branding: {
-          ...prev.branding,
-          [field]: imageUrl,
-        },
-      }))
+      let updatedContent
+      setLandingContent((prev) => {
+        updatedContent = {
+          ...prev,
+          branding: {
+            ...prev.branding,
+            [field]: imageUrl,
+          },
+        }
+        return updatedContent
+      })
+
+      // Auto-save image uploads to Firestore for real-time updates
+      try {
+        await updateLandingPageContent(updatedContent)
+      } catch (saveError) {
+        console.error("Error auto-saving branding image:", saveError)
+        // Don't show error to user, just log it
+      }
+
       showNotification("Brand asset uploaded successfully")
     } catch (error) {
       console.error("Error uploading branding image:", error)
@@ -408,10 +434,20 @@ export default function WelcomeEditorPage() {
 
     try {
       const imageUrl = await uploadLogoImage(file)
-      setLogoContent((prev) => ({
-        ...prev,
+      const updatedLogoContent = {
+        ...logoContent,
         imageUrl,
-      }))
+      }
+      setLogoContent(updatedLogoContent)
+
+      // Auto-save logo uploads to Firestore for real-time updates
+      try {
+        await updateLogoContent(updatedLogoContent)
+      } catch (saveError) {
+        console.error("Error auto-saving logo:", saveError)
+        // Don't show error to user, just log it
+      }
+
       showNotification("Logo image uploaded successfully")
     } catch (error) {
       console.error("Error uploading logo image:", error)
@@ -1175,6 +1211,44 @@ export default function WelcomeEditorPage() {
                           className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
                         />
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-graphite mb-1">
+                          Map Embed URL
+                          <span className="text-xs text-drift-gray ml-2 font-normal">(Google Maps embed URL)</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={landingContent.branding.contact.mapUrl || ""}
+                          onChange={(e) => handleBrandingContactChange("mapUrl", e.target.value)}
+                          className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                          placeholder="https://www.google.com/maps/embed?pb=..."
+                        />
+                        <div className="mt-2 p-3 bg-amber-50/50 border border-amber-200/50 rounded-lg">
+                          <p className="text-xs font-semibold text-graphite mb-1.5">How to get Google Maps embed URL:</p>
+                          <ol className="text-xs text-drift-gray space-y-1 list-decimal list-inside mb-2">
+                            <li>Go to <a href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer" className="text-soft-amber hover:underline">Google Maps</a> and search for your location</li>
+                            <li>Click the <strong>"Share"</strong> button</li>
+                            <li>Select the <strong>"Embed a map"</strong> tab</li>
+                            <li>Click <strong>"Copy HTML"</strong> button</li>
+                            <li>Extract the URL from the iframe: Look for <code className="bg-white px-1 rounded">src="..."</code> and copy only the URL inside the quotes</li>
+                            <li>Paste the URL in the field above (should start with <code className="bg-white px-1 rounded">https://www.google.com/maps/embed</code>)</li>
+                          </ol>
+                          <div className="mt-2 p-2 bg-white rounded border border-amber-200">
+                            <p className="text-xs font-semibold text-graphite mb-1">Example URL format:</p>
+                            <code className="text-xs text-drift-gray break-all">
+                              https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d...
+                            </code>
+                          </div>
+                        </div>
+                        {landingContent.branding.contact.mapUrl && (
+                          <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-xs text-green-800 flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3" />
+                              Map URL configured. The map will be displayed on the landing page.
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-4">
                       <div>
@@ -1187,13 +1261,24 @@ export default function WelcomeEditorPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-graphite mb-1">Footer Note</label>
+                        <label className="block text-sm font-medium text-graphite mb-1">
+                          Footer Note (Copyright Text)
+                        </label>
                         <input
                           type="text"
                           value={landingContent.branding.footer.note}
                           onChange={(e) => handleBrandingFooterChange("note", e.target.value)}
                           className="w-full px-3 py-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber"
+                          placeholder="All rights reserved."
                         />
+                        <p className="text-xs text-drift-gray mt-1">
+                          This text appears after the copyright year and brand name in the footer.
+                        </p>
+                        <div className="mt-2 p-3 bg-pale-stone/30 rounded-md border border-earth-beige/30">
+                          <p className="text-xs text-drift-gray">
+                            <span className="font-semibold">Preview:</span> © {new Date().getFullYear()} {landingContent.branding.name || "Smart Care"}. {landingContent.branding.footer.note || "All rights reserved."}
+                          </p>
+                        </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
