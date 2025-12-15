@@ -3,6 +3,7 @@ import "@/app/globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import { PostLoginWelcome } from "@/components/post-login-welcome"
 import { RegisterServiceWorker } from "@/app/register-sw"
+import { DynamicFavicon } from "@/components/dynamic-favicon"
 
 
 const manrope = Manrope({ 
@@ -53,6 +54,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="min-h-screen bg-pale-stone font-manrope antialiased">
         <RegisterServiceWorker />
+        <DynamicFavicon />
         <AuthProvider>
           <PostLoginWelcome />
           {children}
