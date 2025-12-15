@@ -54,6 +54,17 @@ export default function RoomPage({ params }) {
   const [showEndModal, setShowEndModal] = useState(false)
   const hasShownEndedToastRef = useRef(false)
 
+  const getRedirectPath = (callData) => {
+    const role = userRole || callData?.callerRole || callData?.receiverRole || callData?.role
+    if (role === "doctor") return "/doctor/dashboard"
+    if (role === "admin") return "/admin/dashboard"
+    // Fallback: if current path is under /doctor, keep doctor dashboard
+    if (typeof window !== "undefined" && window.location.pathname.startsWith("/doctor")) {
+      return "/doctor/dashboard"
+    }
+    return "/dashboard"
+  }
+
   const configuration = {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
@@ -192,12 +203,18 @@ export default function RoomPage({ params }) {
         // Check if room exists and is active - if not, redirect away
         if (!callSnap.exists()) {
           console.log("❌ Room does not exist, redirecting to dashboard...")
+          if (!hasShownEndedToastRef.current) {
+            toast({
+              title: "Room already ended",
+              description: "This room is no longer available.",
+              variant: "destructive",
+            })
+            hasShownEndedToastRef.current = true
+          }
           if (typeof window !== "undefined") {
-            if (userRole === "doctor") {
-              window.location.href = "/doctor/dashboard"
-            } else {
-              window.location.href = "/dashboard"
-            }
+            setTimeout(() => {
+              window.location.assign(getRedirectPath())
+            }, 150)
           }
           return
         }
@@ -217,11 +234,7 @@ export default function RoomPage({ params }) {
           }
           if (typeof window !== "undefined") {
             setTimeout(() => {
-              if (userRole === "doctor") {
-                window.location.assign("/doctor/dashboard")
-              } else {
-                window.location.assign("/dashboard")
-              }
+              window.location.assign(getRedirectPath(callData))
             }, 150)
           }
           return
@@ -250,7 +263,7 @@ export default function RoomPage({ params }) {
           if (callData.status === "ended" || callData.status === "cancelled" || callData.status === "closed" || callData.revokedBy) {
             console.log("❌ Cannot join: Room is ended. Redirecting to dashboard...")
             if (typeof window !== "undefined") {
-              window.location.href = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+              setTimeout(() => window.location.assign(getRedirectPath(callData)), 150)
             }
             return
           }
@@ -258,7 +271,7 @@ export default function RoomPage({ params }) {
           if (!(callData.status === "pending" || callData.status === "active")) {
             console.log("❌ Cannot join: Room is not in joinable state. Redirecting to dashboard...")
             if (typeof window !== "undefined") {
-              window.location.href = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+              setTimeout(() => window.location.assign(getRedirectPath(callData)), 150)
             }
             return
           }
@@ -282,7 +295,7 @@ export default function RoomPage({ params }) {
         if (!current.exists() || data.status === "ended" || data.status === "cancelled" || data.status === "closed" || data.revokedBy) {
           console.log("❌ Cannot proceed: Room was ended. Redirecting to dashboard...")
           if (typeof window !== "undefined") {
-            window.location.href = userRole === "doctor" ? "/doctor/dashboard" : "/dashboard"
+            setTimeout(() => window.location.assign(getRedirectPath(data)), 150)
           }
           return
         }
@@ -348,10 +361,20 @@ export default function RoomPage({ params }) {
           if (!d) {
             // Room deleted - redirect to dashboard
             console.log("❌ Room was deleted, redirecting to dashboard...")
+            if (!hasShownEndedToastRef.current) {
+              toast({
+                title: "Room already ended",
+                description: "The call has been closed.",
+                variant: "destructive",
+              })
+              hasShownEndedToastRef.current = true
+            }
             try { if (pcRef.current) pcRef.current.close() } catch {}
             try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t)=>t.stop()) } catch {}
             if (typeof window !== "undefined") {
-              window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
+              setTimeout(() => {
+                window.location.assign(getRedirectPath())
+              }, 150)
             }
             return
           }
@@ -671,7 +694,7 @@ export default function RoomPage({ params }) {
           hasShownEndedToastRef.current = true
         }
         setTimeout(() => {
-          window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
+          window.location.assign(getRedirectPath())
         }, 150)
       }
     }
