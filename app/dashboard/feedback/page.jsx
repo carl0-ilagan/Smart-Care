@@ -667,6 +667,7 @@ export default function PatientFeedbackPage() {
                         <div className="flex items-center mb-2">
                           <div className="relative h-8 w-8 rounded-full overflow-hidden mr-2 bg-earth-beige flex-shrink-0">
                             <ProfileImage
+                              userId={feedback.respondedBy}
                               src={getAdminProfilePic(feedback.respondedBy)}
                               alt={getAdminName(feedback.respondedBy)}
                               className="h-full w-full"

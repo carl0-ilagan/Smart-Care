@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import { User, UserCog, UserRound } from "lucide-react"
 import { getUserProfile } from "@/lib/firebase-utils"
+import { doc, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 /**
  * A reusable profile image component that fetches and displays user profile images
@@ -42,37 +44,81 @@ export default function ProfileImage({
   // Determine the size class
   const sizeClass = sizeClasses[size] || sizeClasses.md
 
-  // Fetch user profile data if userId is provided
+  // Fetch user profile data if userId is provided with real-time updates
   useEffect(() => {
     if (!userId) return
 
-    const fetchUserProfile = async () => {
-      try {
-        setLoading(true)
-
-        // Use the existing getUserProfile utility function
-        const userData = await getUserProfile(userId)
-
-        if (userData) {
+    // Set up real-time listener for profile updates
+    const unsubscribe = onSnapshot(
+      doc(db, "users", userId),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const userData = docSnap.data()
           setProfileData({
             photoURL: userData.photoURL || null,
             displayName: userData.displayName || userData.name || null,
             role: userData.role || role,
           })
+          // Reset imgError when new data is received
+          setImgError(false)
+          setLoading(false)
         } else {
-          console.log(`No user data found for ID: ${userId}`)
-          setProfileData(null)
+          // Document doesn't exist, try one-time fetch as fallback
+          getUserProfile(userId)
+            .then((userData) => {
+              if (userData) {
+                setProfileData({
+                  photoURL: userData.photoURL || null,
+                  displayName: userData.displayName || userData.name || null,
+                  role: userData.role || role,
+                })
+              } else {
+                setProfileData(null)
+              }
+            })
+            .catch((error) => {
+              console.error("Error fetching user profile:", error)
+              setProfileData(null)
+            })
+            .finally(() => {
+              setLoading(false)
+            })
         }
-      } catch (error) {
-        console.error("Error fetching user profile:", error)
-        setProfileData(null)
-      } finally {
-        setLoading(false)
+      },
+      (error) => {
+        console.error("Error listening to profile updates:", error)
+        // Fallback to one-time fetch on error
+        getUserProfile(userId)
+          .then((userData) => {
+            if (userData) {
+              setProfileData({
+                photoURL: userData.photoURL || null,
+                displayName: userData.displayName || userData.name || null,
+                role: userData.role || role,
+              })
+            } else {
+              setProfileData(null)
+            }
+          })
+          .catch((err) => {
+            console.error("Error fetching user profile:", err)
+            setProfileData(null)
+          })
+          .finally(() => {
+            setLoading(false)
+          })
       }
-    }
+    )
 
-    fetchUserProfile()
+    return () => unsubscribe()
   }, [userId, role])
+
+  // Reset imgError when src changes
+  useEffect(() => {
+    if (src) {
+      setImgError(false)
+    }
+  }, [src])
 
   // Handle image load error
   const handleError = () => {
@@ -116,17 +162,15 @@ export default function ProfileImage({
     <div
       className={`rounded-full bg-pale-stone overflow-hidden flex items-center justify-center ${sizeClass} ${className}`}
     >
-      {/* Prioritize admin icon */}
-      {role === "admin" ? (
-        getRoleIcon()
-      ) : // Prioritize provided src for non-admins
-      imageSrc && !imgError ? (
-        // Image available
+      {/* Show image if available (for all roles including admin) */}
+      {imageSrc && !imgError ? (
+        // Image available - show for all roles
         <img
           src={imageSrc}
           alt={alt || profileData?.displayName || "Profile"}
           className={imgClassName}
           onError={handleError}
+          key={imageSrc} // Force re-render when image changes
         />
       ) : loading ? (
         // Loading state while fetching profile data if src is not available
@@ -137,7 +181,7 @@ export default function ProfileImage({
           {getInitials()}
         </div>
       ) : (
-        // Fallback to default icon for non-admins without image, fallback, or display name
+        // Fallback to role icon when no image, fallback, or display name
         getRoleIcon()
       )}
     </div>

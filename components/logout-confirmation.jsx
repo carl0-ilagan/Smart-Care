@@ -11,6 +11,7 @@ export function LogoutConfirmation({ isOpen, onClose, onConfirm, onCancel, title
   const [isDragging, setIsDragging] = useState(false)
   const [isClosing, setIsClosing] = useState(false)
   const [isPWA, setIsPWA] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
   const modalRef = useRef(null)
 
   // Check if running as PWA
@@ -55,10 +56,11 @@ export function LogoutConfirmation({ isOpen, onClose, onConfirm, onCancel, title
     }
   }, [isOpen])
 
-  // Reset offset when modal opens/closes
+  // Reset offset and confirming state when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
       setOffsetX(0)
+      setIsConfirming(false)
     }
   }, [isOpen])
 
@@ -121,14 +123,24 @@ export function LogoutConfirmation({ isOpen, onClose, onConfirm, onCancel, title
   }
 
   const handleConfirm = () => {
+    // Prevent multiple confirmations
+    if (isConfirming) return
+    
+    setIsConfirming(true)
+    // Close modal immediately to prevent double modal
+    if (typeof onClose === 'function') {
+      onClose()
+    }
     setIsClosing(true)
+    // Small delay to allow modal to close, then execute logout
     setTimeout(() => {
       setIsClosing(false)
       // Pass force=true to logout if in PWA mode (user explicitly confirmed)
       if (typeof onConfirm === 'function') {
         onConfirm(true) // Force logout even in PWA mode when user confirms
       }
-    }, 300)
+      setIsConfirming(false)
+    }, 100)
   }
 
   const handleCancel = () => {
@@ -243,10 +255,11 @@ export function LogoutConfirmation({ isOpen, onClose, onConfirm, onCancel, title
                   </button>
                   <button
                     onClick={handleConfirm}
-                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-lg hover:bg-orange-600 transition-all duration-200 hover:shadow-xl"
+                    disabled={isConfirming}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 sm:px-6 sm:py-3 text-xs sm:text-sm font-semibold text-white shadow-lg hover:bg-orange-600 transition-all duration-200 hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Yes, Logout
+                    {isConfirming ? "Logging out..." : "Yes, Logout"}
                   </button>
                 </div>
               </div>

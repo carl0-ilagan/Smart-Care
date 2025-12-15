@@ -11,8 +11,6 @@ import {
   Settings,
   Lock,
   UserCircle,
-  Eye,
-  EyeOff,
   LogOut,
   Clock,
   Calendar,
@@ -26,7 +24,7 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { getUserProfile, updateUserProfile, uploadProfilePhoto } from "@/lib/firebase-utils"
 import { AdminHeaderBanner } from "@/components/admin-header-banner"
-import { doc, serverTimestamp, updateDoc } from "firebase/firestore"
+import { doc, serverTimestamp, updateDoc, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { SuccessNotification } from "@/components/success-notification"
 import { useRouter } from "next/navigation"
@@ -46,9 +44,6 @@ export default function AdminProfilePage() {
   const [isValidationError, setIsValidationError] = useState(false)
   const [loading, setLoading] = useState(false)
   const [sessionLoading, setSessionLoading] = useState(false)
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
-  const [showNewPassword, setShowNewPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [sessions, setSessions] = useState([])
   const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false)
   const [twoFactorSecret, setTwoFactorSecret] = useState("")
@@ -71,9 +66,6 @@ export default function AdminProfilePage() {
     emergencyPhone: "",
   })
   const [securityData, setSecurityData] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
     twoFactorEnabled: false,
   })
   const [preferencesData, setPreferencesData] = useState({
@@ -87,59 +79,80 @@ export default function AdminProfilePage() {
 
   const { user } = useAuth()
 
-  // Fetch user profile data on component mount
+  // Fetch user profile data on component mount with real-time updates
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (user?.uid) {
-        try {
-          setLoading(true)
-          const profile = await getUserProfile(user.uid)
-          if (profile) {
-            setProfileData({
-              displayName: profile.displayName || user.displayName || "",
-              email: profile.email || user.email || "",
-              phone: profile.phone || "",
-              jobTitle: profile.jobTitle || "System Administrator",
-              bio: profile.bio || "",
-              firstName: profile.firstName || "",
-              lastName: profile.lastName || "",
-              officeAddress: profile.officeAddress || "",
-              department: profile.department || "Administration",
-              hireDate: profile.hireDate || "",
-              emergencyContact: profile.emergencyContact || "",
-              emergencyPhone: profile.emergencyPhone || "",
-            })
+    if (!user?.uid) return
 
-            // Set security and preferences data if available
-            if (profile.preferences) {
-              setPreferencesData({
-                ...preferencesData,
-                ...profile.preferences,
-              })
-            }
+    // Set up real-time listener for profile updates
+    const unsubscribe = onSnapshot(
+      doc(db, "users", user.uid),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const profile = docSnap.data()
+          
+          setProfileData({
+            displayName: profile.displayName || user.displayName || "",
+            email: profile.email || user.email || "",
+            phone: profile.phone || "",
+            jobTitle: profile.jobTitle || "System Administrator",
+            bio: profile.bio || "",
+            firstName: profile.firstName || "",
+            lastName: profile.lastName || "",
+            officeAddress: profile.officeAddress || "",
+            department: profile.department || "Administration",
+            hireDate: profile.hireDate || "",
+            emergencyContact: profile.emergencyContact || "",
+            emergencyPhone: profile.emergencyPhone || "",
+          })
 
-            if (profile.security) {
-              setSecurityData({
-                ...securityData,
-                twoFactorEnabled: profile.security.twoFactorEnabled || false,
-              })
-            }
-
-            // Set photo preview if available
-            if (profile.photoURL || user.photoURL) {
-              setPhotoPreview(profile.photoURL || user.photoURL)
-            }
+          // Set security and preferences data if available
+          if (profile.preferences) {
+            setPreferencesData((prev) => ({
+              ...prev,
+              ...profile.preferences,
+            }))
           }
-        } catch (error) {
-          console.error("Error fetching profile:", error)
-          showSuccessNotification("Failed to load profile data", true)
-        } finally {
-          setLoading(false)
-        }
-      }
-    }
 
-    fetchProfile()
+          if (profile.security) {
+            setSecurityData((prev) => ({
+              ...prev,
+              twoFactorEnabled: profile.security.twoFactorEnabled || false,
+            }))
+          }
+
+          // Update photo preview in real-time when changed
+          // Only update if it's a different URL (not a data URL from FileReader)
+          const newPhotoURL = profile.photoURL || user.photoURL
+          const currentPreview = photoPreview
+          
+          // Only update if:
+          // 1. We have a new photoURL from Firestore
+          // 2. It's different from current preview
+          // 3. Current preview is not a data URL (base64) - meaning upload is complete
+          if (newPhotoURL) {
+            const isDataURL = currentPreview && currentPreview.startsWith('data:')
+            if (!isDataURL && newPhotoURL !== currentPreview) {
+              console.log("[Admin Profile] Real-time update: Photo URL changed to:", newPhotoURL)
+              setPhotoPreview(newPhotoURL)
+              setPhotoFile(null) // Clear photo file if image was updated from elsewhere
+            } else if (isDataURL) {
+              // If we have a data URL (upload in progress), keep it until upload completes
+              // The upload function will update it with the actual URL
+              console.log("[Admin Profile] Upload in progress, keeping data URL preview")
+            }
+          } else if (!newPhotoURL && currentPreview && !currentPreview.startsWith('data:')) {
+            // Only clear if current preview is not a data URL
+            setPhotoPreview(null)
+          }
+        }
+      },
+      (error) => {
+        console.error("Error listening to profile updates:", error)
+        showSuccessNotification("Failed to load profile data", true)
+      }
+    )
+
+    return () => unsubscribe()
   }, [user])
 
   // Apply preferences when they change
@@ -367,16 +380,66 @@ export default function AdminProfilePage() {
     }))
   }
 
-  // Handle photo file selection
-  const handlePhotoChange = (e) => {
+  // Handle photo file selection and immediate upload
+  const handlePhotoChange = async (e) => {
     const file = e.target.files[0]
-    if (file) {
-      setPhotoFile(file)
+    if (!file || !user?.uid) return
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      showSuccessNotification("Image size exceeds 2MB limit. Please choose a smaller image.", true)
+      return
+    }
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      showSuccessNotification("Please select a valid image file.", true)
+      return
+    }
+
+    try {
+      setLoading(true)
+      
+      // Show preview immediately for better UX
       const reader = new FileReader()
       reader.onloadend = () => {
         setPhotoPreview(reader.result)
       }
       reader.readAsDataURL(file)
+      setPhotoFile(file)
+
+      console.log("[Admin Profile] Starting photo upload for user:", user.uid)
+      
+      // Upload immediately for real-time update
+      const photoURL = await uploadProfilePhoto(user.uid, file)
+      
+      console.log("[Admin Profile] Photo uploaded successfully:", photoURL)
+      
+      // Update preview with the actual uploaded URL (with cache busting)
+      setPhotoPreview(photoURL)
+      setPhotoFile(null) // Clear after upload
+      
+      // Force a small delay to ensure Firestore update is processed
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      showSuccessNotification("Profile photo updated successfully")
+    } catch (error) {
+      console.error("[Admin Profile] Error uploading profile photo:", error)
+      console.error("[Admin Profile] Error details:", {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      })
+      
+      const errorMessage = error.message || "Failed to upload profile photo. Please try again."
+      showSuccessNotification(errorMessage, true)
+      
+      // Reset preview on error - use current user photoURL if available
+      const currentPhotoURL = user?.photoURL || null
+      setPhotoPreview(currentPhotoURL)
+      setPhotoFile(null)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -505,28 +568,7 @@ export default function AdminProfilePage() {
           }
         }
 
-        // Password validation
-        if (securityData.newPassword) {
-          if (securityData.newPassword !== securityData.confirmPassword) {
-            throw new Error("New passwords do not match")
-          }
-
-          if (securityData.newPassword.length < 8) {
-            throw new Error("Password must be at least 8 characters long")
-          }
-
-          // Note: Actual password change would be handled through Firebase Auth
-          // This is just for UI demonstration
-          showSuccessNotification("Password updated successfully")
-
-          // Clear password fields
-          setSecurityData((prev) => ({
-            ...prev,
-            currentPassword: "",
-            newPassword: "",
-            confirmPassword: "",
-          }))
-        }
+        // Password changes are handled through Google Auth - no need to process here
       } else if (activeTab === "preferences") {
         updateData = {
           preferences: preferencesData,
@@ -541,12 +583,7 @@ export default function AdminProfilePage() {
       // Update profile in Firestore
       await updateUserProfile(user.uid, updateData)
 
-      // Upload photo if changed
-      if (photoFile) {
-        await uploadProfilePhoto(user.uid, photoFile)
-        setPhotoFile(null) // Reset after upload
-        showSuccessNotification("Profile photo updated successfully")
-      }
+      // Photo is now uploaded immediately when selected, so no need to upload here
     } catch (error) {
       console.error("Error saving profile:", error)
       showSuccessNotification(error.message || "Failed to update profile", true)
@@ -594,12 +631,25 @@ export default function AdminProfilePage() {
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex flex-col md:flex-row items-center gap-6">
           <div className="relative">
-            <div className="h-24 w-24 rounded-full overflow-hidden">
-              <ProfileImage src={photoPreview} alt="Profile" className="h-24 w-24" role="admin" />
+            <div className="h-24 w-24 rounded-full overflow-hidden border-2 border-soft-amber/30">
+              <ProfileImage 
+                src={photoPreview || user?.photoURL} 
+                userId={user?.uid}
+                alt="Profile" 
+                className="h-24 w-24" 
+                role="admin"
+                key={photoPreview || user?.photoURL || 'admin-profile'} // Force re-render when image changes
+              />
             </div>
-            <label className="absolute bottom-0 right-0 bg-white rounded-full p-1.5 shadow-md hover:bg-pale-stone cursor-pointer">
+            <label className="absolute bottom-0 right-0 bg-white rounded-full p-1.5 shadow-md hover:bg-pale-stone cursor-pointer transition-all hover:scale-110">
               <Camera className="h-4 w-4 text-drift-gray" />
-              <input type="file" className="hidden" accept="image/*" onChange={handlePhotoChange} />
+              <input 
+                type="file" 
+                className="hidden" 
+                accept="image/*" 
+                onChange={handlePhotoChange}
+                disabled={loading}
+              />
             </label>
           </div>
           <div className="flex-1 text-center md:text-left">
@@ -843,79 +893,14 @@ export default function AdminProfilePage() {
               </h2>
 
               <div className="space-y-6">
-                <div>
-                  <h3 className="font-medium text-graphite mb-3">Change Password</h3>
-                  <div className="space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                  <div className="flex items-start">
+                    <Shield className="h-5 w-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
                     <div>
-                      <label htmlFor="currentPassword" className="block text-sm font-medium text-graphite mb-1">
-                        Current Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showCurrentPassword ? "text" : "password"}
-                          id="currentPassword"
-                          name="currentPassword"
-                          value={securityData.currentPassword}
-                          onChange={handleSecurityChange}
-                          placeholder="Enter your current password"
-                          className="w-full p-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-drift-gray hover:text-graphite"
-                        >
-                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="newPassword" className="block text-sm font-medium text-graphite mb-1">
-                        New Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showNewPassword ? "text" : "password"}
-                          id="newPassword"
-                          name="newPassword"
-                          value={securityData.newPassword}
-                          onChange={handleSecurityChange}
-                          placeholder="Enter new password"
-                          className="w-full p-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-drift-gray hover:text-graphite"
-                        >
-                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-graphite mb-1">
-                        Confirm New Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? "text" : "password"}
-                          id="confirmPassword"
-                          name="confirmPassword"
-                          value={securityData.confirmPassword}
-                          onChange={handleSecurityChange}
-                          placeholder="Confirm new password"
-                          className="w-full p-2 border border-earth-beige rounded-md focus:ring-soft-amber focus:border-soft-amber pr-10"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center text-drift-gray hover:text-graphite"
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
+                      <h4 className="text-sm font-medium text-blue-900 mb-1">Google Authentication</h4>
+                      <p className="text-xs text-blue-700">
+                        Your account is secured with Google Authentication. Password changes are managed through your Google account settings.
+                      </p>
                     </div>
                   </div>
                 </div>

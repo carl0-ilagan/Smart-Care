@@ -1,11 +1,11 @@
 "use client"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { X, ChevronLeft, ChevronRight, Clock, SettingsIcon } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { LogoutConfirmation } from "@/components/logout-confirmation"
+import ProfileImage from "@/components/profile-image"
 
 // Import icons
 import {
@@ -218,17 +218,14 @@ export default function AdminSidebar({ isOpen = true, onClose, isMobile = false,
               onClick={() => setShowUserDetails(!showUserDetails)}
             >
               <div className="h-8 w-8 rounded-full bg-soft-amber/20 flex items-center justify-center text-soft-amber mr-2 overflow-hidden">
-                {photoURL ? (
-                  <Image
-                    src={photoURL || "/placeholder.svg"}
-                    alt="Admin"
-                    width={32}
-                    height={32}
-                    className="rounded-full"
-                  />
-                ) : (
-                  <User className="h-4 w-4" />
-                )}
+                <ProfileImage
+                  userId={user?.uid}
+                  src={photoURL}
+                  alt="Admin"
+                  className="h-8 w-8"
+                  role="admin"
+                  size="sm"
+                />
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-xs text-graphite">{displayName}</p>

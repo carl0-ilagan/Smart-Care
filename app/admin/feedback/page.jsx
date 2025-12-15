@@ -576,6 +576,7 @@ export default function AdminFeedbackPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-earth-beige">
                         <ProfileImage
+                          userId={selected.respondedBy}
                           src={getAdminProfilePic(selected.respondedBy)}
                           alt={getAdminName(selected.respondedBy)}
                           className="h-full w-full"
