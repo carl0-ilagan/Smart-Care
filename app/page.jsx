@@ -942,6 +942,10 @@ export default function HomePage() {
                 }
                 return item
               } catch (err) {
+                if (err?.code === "permission-denied") {
+                  // Public landing view may not have permission to read users; fall back to stored testimonial fields
+                  return item
+                }
                 console.warn("Failed to enrich testimonial user data", err)
                 return item
               }

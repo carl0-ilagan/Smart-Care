@@ -240,7 +240,11 @@ export default function AdminFeedbackPage() {
     try {
       setResponding(true)
       setError("")
-      const updated = await respondToFeedback(selected.id, responseText.trim(), user?.uid || null)
+      const responderProfile = {
+        name: user?.displayName || "Admin",
+        photoURL: user?.photoURL || adminProfiles[user?.uid || ""]?.photoURL || null,
+      }
+      const updated = await respondToFeedback(selected.id, responseText.trim(), user?.uid || null, responderProfile)
       setFeedback((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
       setSelected((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev))
       

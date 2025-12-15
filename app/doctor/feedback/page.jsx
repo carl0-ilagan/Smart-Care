@@ -636,14 +636,14 @@ export default function DoctorFeedbackPage() {
                           <div className="relative h-8 w-8 rounded-full overflow-hidden mr-2 bg-earth-beige flex-shrink-0">
                             <ProfileImage
                               userId={feedback.respondedBy}
-                              src={getAdminProfilePic(feedback.respondedBy)}
-                              alt={getAdminName(feedback.respondedBy)}
+                              src={feedback.respondedByPhotoURL || getAdminProfilePic(feedback.respondedBy)}
+                              alt={feedback.respondedByName || getAdminName(feedback.respondedBy)}
                               className="h-full w-full"
                               role="admin"
                             />
                           </div>
                           <p className="text-xs font-medium text-soft-amber">
-                            Response from {getAdminName(feedback.respondedBy)}:
+                            Response from {feedback.respondedByName || getAdminName(feedback.respondedBy)}:
                           </p>
                         </div>
                         <p className="text-sm text-drift-gray">{feedback.response}</p>
