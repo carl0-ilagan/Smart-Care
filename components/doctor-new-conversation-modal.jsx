@@ -178,7 +178,7 @@ export default function DoctorNewConversationModal({ isOpen, onClose, onConversa
               )}
               <h2 className={`${isMobile ? 'text-xl' : 'text-xl sm:text-2xl'} font-bold text-graphite`}>New Conversation</h2>
             </div>
-          </div>
+        </div>
 
           {/* Content */}
           <div className={`flex-1 overflow-y-auto ${isMobile ? 'bg-pale-stone/30' : 'bg-white'} ${isMobile ? 'px-4 py-4' : 'p-6'} scrollbar-hide`}>
@@ -306,7 +306,7 @@ export default function DoctorNewConversationModal({ isOpen, onClose, onConversa
               ) : (
                 <div className="py-12 text-center">
                   <p className="text-drift-gray mb-1">
-                    {searchTerm ? "No patients found matching your search" : "No patients available"}
+                  {searchTerm ? "No patients found matching your search" : "No patients available"}
                   </p>
                   {searchTerm && (
                     <button

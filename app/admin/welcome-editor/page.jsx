@@ -339,11 +339,11 @@ export default function WelcomeEditorPage() {
       let updatedContent
       setLandingContent((prev) => {
         updatedContent = {
-          ...prev,
-          [section]: {
-            ...prev[section],
-            imageUrl,
-          },
+        ...prev,
+        [section]: {
+          ...prev[section],
+          imageUrl,
+        },
         }
         return updatedContent
       })
@@ -387,11 +387,11 @@ export default function WelcomeEditorPage() {
       let updatedContent
       setLandingContent((prev) => {
         updatedContent = {
-          ...prev,
-          branding: {
-            ...prev.branding,
-            [field]: imageUrl,
-          },
+        ...prev,
+        branding: {
+          ...prev.branding,
+          [field]: imageUrl,
+        },
         }
         return updatedContent
       })

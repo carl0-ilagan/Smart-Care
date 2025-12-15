@@ -180,12 +180,12 @@ export default function NewConversationModal({ isOpen, onClose, onConversationCr
               )}
               <h2 className={`${isMobile ? 'text-xl' : 'text-xl sm:text-2xl'} font-bold text-graphite`}>New Conversation</h2>
             </div>
-          </div>
+        </div>
 
           {/* Content */}
           <div className={`flex-1 overflow-y-auto ${isMobile ? 'bg-pale-stone/30' : 'bg-white'} ${isMobile ? 'px-4 py-4' : 'p-6'} scrollbar-hide`}>
-            {selectedDoctor ? (
-              // Step 2: Write first message
+        {selectedDoctor ? (
+          // Step 2: Write first message
               <div>
                 <div className="flex items-center mb-4 pb-4 border-b border-pale-stone">
                   <button
@@ -195,13 +195,13 @@ export default function NewConversationModal({ isOpen, onClose, onConversationCr
                     <ArrowLeft className="h-5 w-5 text-drift-gray" />
                   </button>
                   <div className="mr-3 h-12 w-12 overflow-hidden rounded-full ring-2 ring-soft-amber/20">
-                    <ProfileImage
-                      src={selectedDoctor.photoURL}
-                      alt={selectedDoctor.displayName || "Doctor"}
-                      className="h-full w-full"
-                      role="doctor"
-                    />
-                  </div>
+                <ProfileImage
+                  src={selectedDoctor.photoURL}
+                  alt={selectedDoctor.displayName || "Doctor"}
+                  className="h-full w-full"
+                  role="doctor"
+                />
+              </div>
                   <div className="flex-1">
                     <h3 className="font-semibold text-graphite">{selectedDoctor.displayName}</h3>
                     <p className="text-sm text-drift-gray">{selectedDoctor.specialty}</p>
@@ -211,8 +211,8 @@ export default function NewConversationModal({ isOpen, onClose, onConversationCr
                         Online
                       </span>
                     )}
-                  </div>
-                </div>
+              </div>
+            </div>
 
             <div className="mb-4">
               <label htmlFor="message" className="block text-sm font-medium text-graphite mb-2">
@@ -253,9 +253,9 @@ export default function NewConversationModal({ isOpen, onClose, onConversationCr
                 )}
               </button>
             </div>
-              </div>
-            ) : (
-              // Step 1: Select a doctor
+          </div>
+        ) : (
+          // Step 1: Select a doctor
               <div>
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-drift-gray" />
@@ -306,7 +306,7 @@ export default function NewConversationModal({ isOpen, onClose, onConversationCr
               ) : (
                 <div className="py-12 text-center">
                   <p className="text-drift-gray mb-1">
-                    {searchTerm ? "No doctors found matching your search" : "No doctors available"}
+                  {searchTerm ? "No doctors found matching your search" : "No doctors available"}
                   </p>
                   {searchTerm && (
                     <button
@@ -319,8 +319,8 @@ export default function NewConversationModal({ isOpen, onClose, onConversationCr
                 </div>
               )}
             </div>
-              </div>
-            )}
+          </div>
+        )}
           </div>
         </div>
       </div>

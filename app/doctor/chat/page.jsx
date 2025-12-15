@@ -1101,14 +1101,14 @@ export default function DoctorChatPage() {
       <>
         <div 
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300" 
-          onClick={() => setShowPatientInfo(false)} 
+              onClick={() => setShowPatientInfo(false)}
         />
         <div className={`fixed z-50 ${isMobile ? 'inset-x-0 bottom-0 w-full max-h-[85vh] rounded-t-3xl' : 'left-1/2 top-1/2 w-full max-w-4xl max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-2xl'} bg-white shadow-2xl overflow-hidden flex flex-col ${isMobile ? 'animate-slide-up' : 'animate-in fade-in-0 zoom-in-95 duration-300'}`}>
           {/* Drag Handle - Mobile only */}
           {isMobile && (
             <div className="flex justify-center pt-2 pb-1">
               <div className="w-12 h-1.5 bg-drift-gray/30 rounded-full"></div>
-            </div>
+          </div>
           )}
 
           {/* Header - Clean style like Meta modal */}
@@ -1134,13 +1134,13 @@ export default function DoctorChatPage() {
                 <div className="bg-white px-4 py-5 border-b border-pale-stone">
                   <div className="flex items-center gap-4">
                     <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-pale-stone ring-2 ring-soft-amber/20">
-                      <ProfileImage
-                        src={patientDetails.photoURL}
-                        alt={patientDetails.displayName || "Patient"}
-                        fallbackType="patient"
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
+              <ProfileImage
+                src={patientDetails.photoURL}
+                alt={patientDetails.displayName || "Patient"}
+                fallbackType="patient"
+                className="h-full w-full object-cover"
+              />
+            </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-base font-semibold text-graphite truncate">{patientDetails.displayName}</h3>
                       {patientDetails.dob && (
@@ -1153,8 +1153,8 @@ export default function DoctorChatPage() {
                         </div>
                       )}
                     </div>
-                  </div>
-                </div>
+            </div>
+          </div>
 
                 {/* Information Cards - Meta style list */}
                 <div className="bg-white">
@@ -1167,11 +1167,11 @@ export default function DoctorChatPage() {
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-medium text-graphite">Medical History</h4>
                         <p className="text-xs text-drift-gray break-words mt-0.5">
-                          {patientDetails.medicalConditions || "No medical history recorded"}
-                        </p>
+                {patientDetails.medicalConditions || "No medical history recorded"}
+              </p>
                       </div>
                     </div>
-                  </div>
+            </div>
 
                   {/* Allergies */}
                   <div className="w-full px-4 py-4 flex items-center border-b border-pale-stone">
@@ -1186,7 +1186,7 @@ export default function DoctorChatPage() {
                         </p>
                       </div>
                     </div>
-                  </div>
+            </div>
 
                   {/* Current Medications */}
                   <div className="w-full px-4 py-4 flex items-center border-b border-pale-stone">
@@ -1217,7 +1217,7 @@ export default function DoctorChatPage() {
                           <Phone className="h-4 w-4 text-soft-amber flex-shrink-0" />
                           <span className="break-all">{patientDetails.phone}</span>
                         </a>
-                      ) : (
+              ) : (
                         <p className="text-xs text-drift-gray italic">No phone number recorded</p>
                       )}
                       {patientDetails.email ? (
@@ -1227,19 +1227,19 @@ export default function DoctorChatPage() {
                         </a>
                       ) : (
                         <p className="text-xs text-drift-gray italic">No email recorded</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
+              )}
+            </div>
+            </div>
+          </div>
 
                 {/* View Full Profile Button - Mobile */}
                 <div className="bg-white px-4 py-4 border-t border-pale-stone">
-                  <Link
-                    href={`/doctor/patients/${patientDetails.id}`}
+            <Link
+              href={`/doctor/patients/${patientDetails.id}`}
                     className="w-full rounded-lg bg-soft-amber px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-amber-600 active:bg-amber-700 shadow-sm text-center block"
-                  >
-                    View Full Profile
-                  </Link>
+            >
+              View Full Profile
+            </Link>
                 </div>
               </div>
             ) : (

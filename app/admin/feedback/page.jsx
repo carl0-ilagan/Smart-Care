@@ -455,163 +455,163 @@ export default function AdminFeedbackPage() {
       <div className="flex flex-col gap-4 rounded-xl bg-white p-4 shadow-sm">
         {activeTab === "feedback" ? (
           <>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="flex flex-1 items-center gap-2 rounded-lg border border-earth-beige bg-cream px-3 py-2">
-                <Search size={16} className="text-earth-clay" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search feedback by name, type, or message..."
-                  className="w-full bg-transparent text-sm outline-none placeholder:text-drift-gray"
-                />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <FilterPill
-                  label="Status"
-                  value={statusFilter}
-                  onChange={setStatusFilter}
-                  options={[
-                    { value: "all", label: "All" },
-                    { value: "pending", label: "Pending" },
-                    { value: "responded", label: "Responded" },
-                  ]}
-                />
-                <FilterPill
-                  label="Type"
-                  value={typeFilter}
-                  onChange={setTypeFilter}
-                  options={[
-                    { value: "all", label: "All" },
-                    { value: "general", label: "General" },
-                    { value: "doctor", label: "Doctor" },
-                    { value: "service", label: "Service" },
-                  ]}
-                />
-                <button
-                  onClick={() => loadFeedback(true)}
-                  className="inline-flex items-center gap-2 rounded-lg border border-earth-beige px-3 py-2 text-sm text-deep-forest transition hover:border-amber-500 hover:text-amber-700"
-                >
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                  Refresh
-                </button>
-              </div>
-            </div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-1 items-center gap-2 rounded-lg border border-earth-beige bg-cream px-3 py-2">
+            <Search size={16} className="text-earth-clay" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search feedback by name, type, or message..."
+              className="w-full bg-transparent text-sm outline-none placeholder:text-drift-gray"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <FilterPill
+              label="Status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: "all", label: "All" },
+                { value: "pending", label: "Pending" },
+                { value: "responded", label: "Responded" },
+              ]}
+            />
+            <FilterPill
+              label="Type"
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={[
+                { value: "all", label: "All" },
+                { value: "general", label: "General" },
+                { value: "doctor", label: "Doctor" },
+                { value: "service", label: "Service" },
+              ]}
+            />
+            <button
+              onClick={() => loadFeedback(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-earth-beige px-3 py-2 text-sm text-deep-forest transition hover:border-amber-500 hover:text-amber-700"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              Refresh
+            </button>
+          </div>
+        </div>
 
-            {error && (
-              <div className="flex items-start gap-2 rounded-md bg-red-50 p-3 text-sm text-red-700">
-                <AlertCircle size={16} />
-                <span>{error}</span>
+        {error && (
+          <div className="flex items-start gap-2 rounded-md bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle size={16} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-3">
+            {loading ? (
+              <div className="flex items-center gap-2 text-sm text-drift-gray">
+                <Loader2 size={16} className="animate-spin" />
+                Loading feedback...
               </div>
+            ) : filteredFeedback.length === 0 ? (
+              <div className="rounded-lg border border-earth-beige bg-cream p-4 text-sm text-drift-gray">
+                No feedback found with current filters.
+              </div>
+            ) : (
+              <div className="space-y-3">{filteredFeedback.map((item) => renderFeedbackItem(item))}</div>
             )}
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-3">
-                {loading ? (
-                  <div className="flex items-center gap-2 text-sm text-drift-gray">
-                    <Loader2 size={16} className="animate-spin" />
-                    Loading feedback...
-                  </div>
-                ) : filteredFeedback.length === 0 ? (
-                  <div className="rounded-lg border border-earth-beige bg-cream p-4 text-sm text-drift-gray">
-                    No feedback found with current filters.
-                  </div>
-                ) : (
-                  <div className="space-y-3">{filteredFeedback.map((item) => renderFeedbackItem(item))}</div>
-                )}
+            {hasMore && (
+              <button
+                onClick={() => loadFeedback(false)}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-earth-beige bg-white px-3 py-2 text-sm text-deep-forest transition hover:border-amber-500 hover:text-amber-700 disabled:opacity-60"
+                disabled={loadingMore}
+              >
+                {loadingMore ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                Load more
+              </button>
+            )}
+          </div>
 
-                {hasMore && (
-                  <button
-                    onClick={() => loadFeedback(false)}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-earth-beige bg-white px-3 py-2 text-sm text-deep-forest transition hover:border-amber-500 hover:text-amber-700 disabled:opacity-60"
-                    disabled={loadingMore}
-                  >
-                    {loadingMore ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                    Load more
-                  </button>
-                )}
-              </div>
-
-              <div className="rounded-lg border border-earth-beige bg-cream p-4">
-                {selected ? (
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-deep-forest">{selected.userName || "Unknown user"}</p>
-                        <p className="text-xs text-graphite">
+          <div className="rounded-lg border border-earth-beige bg-cream p-4">
+            {selected ? (
+              <div className="space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-deep-forest">{selected.userName || "Unknown user"}</p>
+                    <p className="text-xs text-graphite">
                           {selected.userRole || "patient"} • {selected.date || selected.createdAt?.toDate ? new Date(selected.createdAt.toDate()).toLocaleDateString() : "—"}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
                         {activeTab === "feedback" && (
-                          <span className="rounded-full bg-sandstone px-2 py-1 text-xs capitalize text-deep-forest">
-                            {selected.type || "general"}
-                          </span>
+                    <span className="rounded-full bg-sandstone px-2 py-1 text-xs capitalize text-deep-forest">
+                      {selected.type || "general"}
+                    </span>
                         )}
-                        {selected.rating ? (
-                          <span className="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-amber-700">
-                            <Star size={14} className="fill-amber-500 text-amber-500" />
-                            {selected.rating}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
+                    {selected.rating ? (
+                      <span className="flex items-center gap-1 rounded-full bg-white px-2 py-1 text-xs text-amber-700">
+                        <Star size={14} className="fill-amber-500 text-amber-500" />
+                        {selected.rating}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
 
-                    <div className="flex items-center gap-3 rounded-lg bg-white p-3">
-                      <div className="h-10 w-10 overflow-hidden rounded-full bg-earth-beige">
-                        <ProfileImage
-                          src={selected.userProfile}
-                          alt={selected.userName || "User"}
-                          className="h-full w-full"
-                          role={selected.userRole}
-                        />
-                      </div>
-                      <div>
+                <div className="flex items-center gap-3 rounded-lg bg-white p-3">
+                  <div className="h-10 w-10 overflow-hidden rounded-full bg-earth-beige">
+                    <ProfileImage
+                      src={selected.userProfile}
+                      alt={selected.userName || "User"}
+                      className="h-full w-full"
+                      role={selected.userRole}
+                    />
+                  </div>
+                  <div>
                         <p className="text-sm font-medium text-deep-forest">{activeTab === "feedback" ? "Feedback" : "Testimonial"}</p>
-                        <p className="text-sm text-graphite">{selected.message || "No message provided."}</p>
-                      </div>
-                    </div>
+                    <p className="text-sm text-graphite">{selected.message || "No message provided."}</p>
+                  </div>
+                </div>
 
                     {activeTab === "feedback" && selected.status === "responded" && selected.response && (
-                      <div className="rounded-lg bg-white p-3 text-sm text-deep-forest">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-earth-beige">
-                            <ProfileImage
-                              src={getAdminProfilePic(selected.respondedBy)}
-                              alt={getAdminName(selected.respondedBy)}
-                              className="h-full w-full"
-                              role="admin"
-                            />
-                          </div>
-                          <p className="font-semibold text-soft-amber">
-                            Response from {getAdminName(selected.respondedBy)}
-                          </p>
-                        </div>
-                        <p className="mt-1 text-graphite">{selected.response}</p>
+                  <div className="rounded-lg bg-white p-3 text-sm text-deep-forest">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full bg-earth-beige">
+                        <ProfileImage
+                          src={getAdminProfilePic(selected.respondedBy)}
+                          alt={getAdminName(selected.respondedBy)}
+                          className="h-full w-full"
+                          role="admin"
+                        />
                       </div>
-                    )}
+                      <p className="font-semibold text-soft-amber">
+                        Response from {getAdminName(selected.respondedBy)}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-graphite">{selected.response}</p>
+                  </div>
+                )}
 
                     {activeTab === "feedback" && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-semibold text-deep-forest">Send a response</label>
-                        <textarea
-                          value={responseText}
-                          onChange={(e) => setResponseText(e.target.value)}
-                          placeholder="Write a helpful response to this feedback..."
-                          className="h-28 w-full rounded-lg border border-earth-beige bg-white p-3 text-sm outline-none focus:border-amber-500"
-                        />
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-drift-gray">
-                            Response will be visible to the submitter immediately.
-                          </span>
-                          <button
-                            onClick={handleRespond}
-                            disabled={responding}
-                            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:opacity-70"
-                          >
-                            {responding ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                            Send
-                          </button>
-                        </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-deep-forest">Send a response</label>
+                  <textarea
+                    value={responseText}
+                    onChange={(e) => setResponseText(e.target.value)}
+                    placeholder="Write a helpful response to this feedback..."
+                    className="h-28 w-full rounded-lg border border-earth-beige bg-white p-3 text-sm outline-none focus:border-amber-500"
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-drift-gray">
+                      Response will be visible to the submitter immediately.
+                    </span>
+                    <button
+                      onClick={handleRespond}
+                      disabled={responding}
+                      className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:opacity-70"
+                    >
+                      {responding ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                      Send
+                    </button>
+                  </div>
                       </div>
                     )}
                   </div>
@@ -746,16 +746,16 @@ export default function AdminFeedbackPage() {
                           <Loader2 size={16} className="animate-spin text-soft-amber" />
                         )}
                       </label>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-drift-gray">
+                </div>
+              </div>
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-drift-gray">
                     <Star size={18} />
                     Select a testimonial item to view details.
-                  </div>
-                )}
               </div>
-            </div>
+            )}
+          </div>
+        </div>
           </>
         )}
       </div>

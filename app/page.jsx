@@ -1129,47 +1129,47 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <div className="flex flex-col justify-center space-y-3 animate-fadeInUp">
-                  <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-amber-500/10 border border-amber-500/20 w-fit mb-1">
-                    <span className="text-xs sm:text-sm font-semibold text-amber-600">✨ {brandTagline}</span>
-                  </div>
-                  <h1 className="text-3xl sm:text-4xl md:text-5xl xl:text-6xl font-bold tracking-tight text-graphite leading-tight">
-                    {landingContent.hero.title}
-                  </h1>
-                  <p className="max-w-[600px] text-base sm:text-lg md:text-xl text-drift-gray leading-relaxed mt-1">
-                    {landingContent.hero.description}
-                  </p>
-                  <div className="flex flex-col gap-2.5 sm:gap-3 sm:flex-row pt-1">
-                    <button
-                      onClick={() => setShowSignupModal(true)}
-                      className="group inline-flex h-11 sm:h-12 items-center justify-center rounded-lg bg-gradient-to-r from-amber-500 to-amber-400 px-4 sm:px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:shadow-lg hover:from-amber-600 hover:to-amber-500 transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 w-full sm:w-auto"
-                    >
-                      Get Started
-                      <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                    <button
-                      onClick={() => scrollToSection("features")}
-                      className="inline-flex h-11 sm:h-12 items-center justify-center rounded-lg border border-earth-beige bg-white px-4 sm:px-5 py-2.5 text-sm font-medium text-graphite hover:bg-pale-stone transition-colors shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2 w-full sm:w-auto"
-                    >
-                      Learn More
-                    </button>
-                  </div>
+            <div className="flex flex-col justify-center space-y-3 animate-fadeInUp">
+              <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-amber-500/10 border border-amber-500/20 w-fit mb-1">
+                <span className="text-xs sm:text-sm font-semibold text-amber-600">✨ {brandTagline}</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl md:text-5xl xl:text-6xl font-bold tracking-tight text-graphite leading-tight">
+                {landingContent.hero.title}
+              </h1>
+              <p className="max-w-[600px] text-base sm:text-lg md:text-xl text-drift-gray leading-relaxed mt-1">
+                {landingContent.hero.description}
+              </p>
+              <div className="flex flex-col gap-2.5 sm:gap-3 sm:flex-row pt-1">
+                <button
+                  onClick={() => setShowSignupModal(true)}
+                  className="group inline-flex h-11 sm:h-12 items-center justify-center rounded-lg bg-gradient-to-r from-amber-500 to-amber-400 px-4 sm:px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:shadow-lg hover:from-amber-600 hover:to-amber-500 transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 w-full sm:w-auto"
+                >
+                  Get Started
+                  <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+                <button
+                  onClick={() => scrollToSection("features")}
+                  className="inline-flex h-11 sm:h-12 items-center justify-center rounded-lg border border-earth-beige bg-white px-4 sm:px-5 py-2.5 text-sm font-medium text-graphite hover:bg-pale-stone transition-colors shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-earth-beige focus:ring-offset-2 w-full sm:w-auto"
+                >
+                  Learn More
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center justify-center animate-fadeInRight">
+              <div className="relative w-full max-w-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/30 to-amber-400/20 rounded-3xl blur-3xl animate-pulse"></div>
+                <div className="relative">
+                  <div className="absolute -inset-4 bg-gradient-to-r from-amber-500/20 to-amber-400/20 rounded-3xl blur-xl animate-pulse delay-500"></div>
+              <img
+                src={landingContent.hero.imageUrl || "/placeholder.svg"}
+                alt={`${brandName} Platform`}
+                    className="relative aspect-video overflow-hidden rounded-2xl object-cover object-center shadow-2xl transform hover:scale-105 transition-transform duration-500"
+                width={600}
+                height={400}
+              />
                 </div>
-                <div className="flex items-center justify-center animate-fadeInRight">
-                  <div className="relative w-full max-w-lg">
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/30 to-amber-400/20 rounded-3xl blur-3xl animate-pulse"></div>
-                    <div className="relative">
-                      <div className="absolute -inset-4 bg-gradient-to-r from-amber-500/20 to-amber-400/20 rounded-3xl blur-xl animate-pulse delay-500"></div>
-                      <img
-                        src={landingContent.hero.imageUrl || "/placeholder.svg"}
-                        alt={`${brandName} Platform`}
-                        className="relative aspect-video overflow-hidden rounded-2xl object-cover object-center shadow-2xl transform hover:scale-105 transition-transform duration-500"
-                        width={600}
-                        height={400}
-                      />
-                    </div>
-                  </div>
-                </div>
+              </div>
+            </div>
               </>
             )}
           </div>
@@ -1208,17 +1208,17 @@ export default function HomePage() {
               ))
             ) : (
               landingContent.features.map((feature, index) => (
-                <div
-                  key={index}
-                  className="group flex flex-col gap-3 sm:gap-4 rounded-xl sm:rounded-2xl border border-earth-beige/50 bg-white/80 backdrop-blur-sm p-4 sm:p-6 md:p-8 shadow-sm transition-all duration-500 hover:shadow-2xl hover:border-amber-500/50 hover:-translate-y-2 hover:bg-white"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="rounded-lg sm:rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-50 p-3 sm:p-4 w-fit group-hover:from-amber-500/20 group-hover:to-amber-100 transition-all duration-300 group-hover:scale-110">
-                    {getIconComponent(feature.icon, "h-6 w-6 sm:h-8 sm:w-8 text-amber-600")}
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-graphite group-hover:text-amber-600 transition-colors">{feature.title}</h3>
-                  <p className="text-sm sm:text-base text-drift-gray leading-relaxed">{feature.description}</p>
+              <div
+                key={index}
+                className="group flex flex-col gap-3 sm:gap-4 rounded-xl sm:rounded-2xl border border-earth-beige/50 bg-white/80 backdrop-blur-sm p-4 sm:p-6 md:p-8 shadow-sm transition-all duration-500 hover:shadow-2xl hover:border-amber-500/50 hover:-translate-y-2 hover:bg-white"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                <div className="rounded-lg sm:rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-50 p-3 sm:p-4 w-fit group-hover:from-amber-500/20 group-hover:to-amber-100 transition-all duration-300 group-hover:scale-110">
+                  {getIconComponent(feature.icon, "h-6 w-6 sm:h-8 sm:w-8 text-amber-600")}
                 </div>
+                <h3 className="text-lg sm:text-xl font-bold text-graphite group-hover:text-amber-600 transition-colors">{feature.title}</h3>
+                <p className="text-sm sm:text-base text-drift-gray leading-relaxed">{feature.description}</p>
+              </div>
               ))
             )}
           </div>
@@ -1254,32 +1254,32 @@ export default function HomePage() {
               ))
             ) : (
               [
-                {
-                  number: 1,
-                  title: "Create an Account",
-                  description: "Sign up for Smart Care and complete your health profile with relevant medical information."
-                },
-                {
-                  number: 2,
-                  title: "Book an Appointment",
-                  description: "Browse available healthcare providers and schedule a virtual consultation at your convenience."
-                },
-                {
-                  number: 3,
-                  title: "Receive Care",
-                  description: "Connect with your provider via secure video call, get diagnoses, prescriptions, and follow-up care."
-                }
-              ].map((step, index) => (
-                <div key={index} className="group flex flex-col items-center gap-4 text-center p-6 rounded-2xl bg-white/60 backdrop-blur-sm border border-earth-beige/30 hover:bg-white hover:shadow-xl hover:border-amber-500/50 transition-all duration-300 hover:-translate-y-1">
+              {
+                number: 1,
+                title: "Create an Account",
+                description: "Sign up for Smart Care and complete your health profile with relevant medical information."
+              },
+              {
+                number: 2,
+                title: "Book an Appointment",
+                description: "Browse available healthcare providers and schedule a virtual consultation at your convenience."
+              },
+              {
+                number: 3,
+                title: "Receive Care",
+                description: "Connect with your provider via secure video call, get diagnoses, prescriptions, and follow-up care."
+              }
+            ].map((step, index) => (
+              <div key={index} className="group flex flex-col items-center gap-4 text-center p-6 rounded-2xl bg-white/60 backdrop-blur-sm border border-earth-beige/30 hover:bg-white hover:shadow-xl hover:border-amber-500/50 transition-all duration-300 hover:-translate-y-1">
                   <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-amber-400/20 rounded-full blur-xl group-hover:blur-2xl transition-all"></div>
-                    <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-amber-400 text-3xl font-bold text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
-                      {step.number}
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-bold text-graphite group-hover:text-amber-600 transition-colors">{step.title}</h3>
-                  <p className="text-drift-gray leading-relaxed">{step.description}</p>
-                </div>
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 to-amber-400/20 rounded-full blur-xl group-hover:blur-2xl transition-all"></div>
+                  <div className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-500 to-amber-400 text-3xl font-bold text-white shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    {step.number}
+              </div>
+            </div>
+                <h3 className="text-xl font-bold text-graphite group-hover:text-amber-600 transition-colors">{step.title}</h3>
+                <p className="text-drift-gray leading-relaxed">{step.description}</p>
+              </div>
               ))
             )}
           </div>
@@ -1329,9 +1329,9 @@ export default function HomePage() {
                         <div className="h-3 bg-gray-200 rounded w-1/3"></div>
                       </div>
                     </div>
-                  </div>
-                ))}
               </div>
+            ))}
+          </div>
             </div>
           ) : testimonials.length === 0 ? (
             <div className="text-center py-12">
@@ -1379,53 +1379,53 @@ export default function HomePage() {
               </>
             ) : (
               <>
-                <div className="flex items-center justify-center order-2 lg:order-1">
-                  <div className="relative w-full max-w-lg">
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/30 to-amber-400/20 rounded-3xl blur-3xl animate-pulse"></div>
-                    <div className="relative">
-                      <div className="absolute -inset-4 bg-gradient-to-r from-amber-500/20 to-amber-400/20 rounded-3xl blur-xl"></div>
-                      <img
-                        src={landingContent.forDoctors.imageUrl || "/placeholder.svg"}
-                        alt="Doctor using Smart Care"
-                        className="relative aspect-video overflow-hidden rounded-2xl object-cover object-center shadow-2xl transform hover:scale-105 transition-transform duration-500"
-                        width={600}
-                        height={400}
-                      />
+            <div className="flex items-center justify-center order-2 lg:order-1">
+              <div className="relative w-full max-w-lg">
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/30 to-amber-400/20 rounded-3xl blur-3xl animate-pulse"></div>
+                <div className="relative">
+                  <div className="absolute -inset-4 bg-gradient-to-r from-amber-500/20 to-amber-400/20 rounded-3xl blur-xl"></div>
+              <img
+                src={landingContent.forDoctors.imageUrl || "/placeholder.svg"}
+                alt="Doctor using Smart Care"
+                    className="relative aspect-video overflow-hidden rounded-2xl object-cover object-center shadow-2xl transform hover:scale-105 transition-transform duration-500"
+                width={600}
+                height={400}
+              />
+            </div>
+              </div>
+            </div>
+            <div className="flex flex-col justify-center space-y-6 order-1 lg:order-2">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 w-fit mb-4">
+                <span className="text-sm font-semibold text-amber-600">For Healthcare Providers</span>
+              </div>
+              <div className="space-y-4">
+                <h2 className="text-3xl font-bold tracking-tight text-graphite sm:text-4xl md:text-5xl">
+                  {landingContent.forDoctors.title}
+                </h2>
+                <p className="text-lg text-drift-gray md:text-xl leading-relaxed">
+                  {landingContent.forDoctors.description}
+                </p>
+              </div>
+              <ul className="grid gap-4">
+                {landingContent.forDoctors.benefits.map((benefit, index) => (
+                  <li key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/50 transition-colors group">
+                    <div className="rounded-full bg-amber-500/10 p-1.5 group-hover:bg-amber-500/20 transition-colors">
+                      <CheckCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
                     </div>
-                  </div>
-                </div>
-                <div className="flex flex-col justify-center space-y-6 order-1 lg:order-2">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 w-fit mb-4">
-                    <span className="text-sm font-semibold text-amber-600">For Healthcare Providers</span>
-                  </div>
-                  <div className="space-y-4">
-                    <h2 className="text-3xl font-bold tracking-tight text-graphite sm:text-4xl md:text-5xl">
-                      {landingContent.forDoctors.title}
-                    </h2>
-                    <p className="text-lg text-drift-gray md:text-xl leading-relaxed">
-                      {landingContent.forDoctors.description}
-                    </p>
-                  </div>
-                  <ul className="grid gap-4">
-                    {landingContent.forDoctors.benefits.map((benefit, index) => (
-                      <li key={index} className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/50 transition-colors group">
-                        <div className="rounded-full bg-amber-500/10 p-1.5 group-hover:bg-amber-500/20 transition-colors">
-                          <CheckCircle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                        </div>
-                        <span className="text-graphite text-lg group-hover:text-amber-600 transition-colors">{benefit}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="pt-4">
-                    <button
-                      onClick={() => setShowSignupModal(true)}
-                      className="group inline-flex h-14 items-center justify-center rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 px-8 text-base font-semibold text-white transition-all hover:from-amber-600 hover:to-amber-500 hover:shadow-2xl hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 transform duration-300"
-                    >
-                      Join as a Provider
-                      <Stethoscope className="ml-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
-                    </button>
-                  </div>
-                </div>
+                    <span className="text-graphite text-lg group-hover:text-amber-600 transition-colors">{benefit}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="pt-4">
+                <button
+                  onClick={() => setShowSignupModal(true)}
+                  className="group inline-flex h-14 items-center justify-center rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 px-8 text-base font-semibold text-white transition-all hover:from-amber-600 hover:to-amber-500 hover:shadow-2xl hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 transform duration-300"
+                >
+                  Join as a Provider
+                  <Stethoscope className="ml-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
+                </button>
+              </div>
+            </div>
               </>
             )}
           </div>
@@ -1490,12 +1490,12 @@ export default function HomePage() {
                   <div className="flex items-center gap-3 mb-3">
                     <div className="rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 p-3 shadow-lg">
                       <MapPin className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex-1">
+                  </div>
+                  <div className="flex-1">
                       <h3 className="text-2xl font-bold text-graphite">Our Location</h3>
                       <p className="text-sm text-drift-gray">{contactAddress}</p>
-                    </div>
                   </div>
+                </div>
                   {/* Contact Info */}
                   <div className="mt-4 pt-4 border-t border-earth-beige/20 grid grid-cols-1 gap-3">
                     <div className="flex items-center gap-2">
@@ -1504,9 +1504,9 @@ export default function HomePage() {
                         href={phoneHref ? `tel:${phoneHref}` : "#"} 
                         className="text-sm text-graphite hover:text-amber-600 transition-colors font-medium break-words"
                       >
-                        {contactPhone}
-                      </a>
-                    </div>
+                      {contactPhone}
+                    </a>
+                  </div>
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-amber-600 flex-shrink-0" />
                       <a 
@@ -1514,11 +1514,11 @@ export default function HomePage() {
                         className="text-sm text-graphite hover:text-amber-600 transition-colors font-medium break-all"
                         style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
                       >
-                        {contactEmail}
-                      </a>
-                    </div>
+                      {contactEmail}
+                    </a>
                   </div>
                 </div>
+              </div>
                 <div className="flex-1 min-h-[400px] md:min-h-[500px] relative bg-pale-stone/20">
                   {mapUrl && mapUrl.trim() ? (
                     <iframe
@@ -1539,7 +1539,7 @@ export default function HomePage() {
                       <p className="text-sm text-drift-gray text-center px-4">
                         Please configure the map URL in admin settings
                       </p>
-                    </div>
+                  </div>
                   )}
                 </div>
               </div>
@@ -1556,7 +1556,7 @@ export default function HomePage() {
                 </div>
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex-1">
-                    <ContactForm contactEmail={contactEmail} brandName={brandName} />
+                <ContactForm contactEmail={contactEmail} brandName={brandName} />
                   </div>
                   
                   {/* Decorative element at bottom */}

@@ -470,7 +470,7 @@ export default function RoomPage({ params }) {
             if (data.from === (user?.uid || "anon")) return
             try {
               if (pcRef.current && data) {
-                await pcRef.current.addIceCandidate(new RTCIceCandidate(data))
+              await pcRef.current.addIceCandidate(new RTCIceCandidate(data))
               }
             } catch (e) {
               // no-op - candidate might be invalid or connection closed

@@ -25,7 +25,7 @@ const ConversationOptionsMenu = ({
     }
 
     if (showMenu) {
-      document.addEventListener("mousedown", handleClickOutside)
+    document.addEventListener("mousedown", handleClickOutside)
     }
 
     return () => {
@@ -76,7 +76,7 @@ const ConversationOptionsMenu = ({
             : "scale-95 opacity-0 -translate-y-1 pointer-events-none"
         }`}
       >
-        <div className="py-1">
+          <div className="py-1">
           {onMarkAsUnread && (
             <button
               onClick={() => handleMenuItemClick(onMarkAsUnread)}

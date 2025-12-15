@@ -1070,14 +1070,14 @@ export default function MessagesPage() {
       <>
         <div 
           className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300" 
-          onClick={() => setShowDoctorInfo(false)} 
+              onClick={() => setShowDoctorInfo(false)}
         />
         <div className={`fixed z-50 ${isMobile ? 'inset-x-0 bottom-0 w-full max-h-[85vh] rounded-t-3xl' : 'left-1/2 top-1/2 w-full max-w-4xl max-h-[85vh] -translate-x-1/2 -translate-y-1/2 rounded-2xl'} bg-white shadow-2xl overflow-hidden flex flex-col ${isMobile ? 'animate-slide-up' : 'animate-in fade-in-0 zoom-in-95 duration-300'}`}>
           {/* Drag Handle - Mobile only */}
           {isMobile && (
             <div className="flex justify-center pt-2 pb-1">
               <div className="w-12 h-1.5 bg-drift-gray/30 rounded-full"></div>
-            </div>
+          </div>
           )}
 
           {/* Header - Clean style like Meta modal */}
@@ -1106,9 +1106,9 @@ export default function MessagesPage() {
                       <ProfileImage
                         src={doctorDetails.photoURL}
                         alt={doctorDetails.displayName || "Doctor"}
-                        className="h-full w-full object-cover"
+                  className="h-full w-full object-cover"
                         role="doctor"
-                      />
+                />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-base font-semibold text-graphite truncate">{doctorDetails.displayName}</h3>
@@ -1211,8 +1211,8 @@ export default function MessagesPage() {
                           <Mail className="h-4 w-4 text-soft-amber flex-shrink-0" />
                           <span className="break-all">{doctorDetails.email}</span>
                         </a>
-                      )}
-                    </div>
+              )}
+            </div>
                   </div>
                 </div>
               </div>
@@ -1243,8 +1243,8 @@ export default function MessagesPage() {
                         <p className="text-xs text-drift-gray">Online</p>
                       </div>
                     )}
-                  </div>
-                </div>
+            </div>
+          </div>
 
                 {/* Right Side - Information Cards */}
                 <div className="flex-1 grid grid-cols-2 gap-4">
@@ -1254,7 +1254,7 @@ export default function MessagesPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <div className="rounded-lg bg-blue-100 p-2">
                           <Info className="h-4 w-4 text-blue-600" />
-                        </div>
+            </div>
                         <h4 className="text-sm font-semibold text-graphite">About</h4>
                       </div>
                       <p className="text-sm text-graphite pl-10 break-words">{doctorDetails.bio}</p>
@@ -1266,26 +1266,26 @@ export default function MessagesPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <div className="rounded-lg bg-purple-100 p-2">
                         <GraduationCap className="h-4 w-4 text-purple-600" />
-                      </div>
+              </div>
                       <h4 className="text-sm font-semibold text-graphite">Education</h4>
-                    </div>
+              </div>
                     <p className="text-sm text-graphite pl-10 break-words">
                       {doctorDetails.education || <span className="text-drift-gray italic">Not specified</span>}
                     </p>
-                  </div>
+              </div>
 
                   {/* Experience */}
                   <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-green-50/50 to-white p-4 shadow-sm">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="rounded-lg bg-green-100 p-2">
                         <Briefcase className="h-4 w-4 text-green-600" />
-                      </div>
+              </div>
                       <h4 className="text-sm font-semibold text-graphite">Experience</h4>
-                    </div>
+            </div>
                     <p className="text-sm text-graphite pl-10 break-words">
                       {doctorDetails.experience || <span className="text-drift-gray italic">Not specified</span>}
                     </p>
-                  </div>
+          </div>
 
                   {/* Languages */}
                   <div className="rounded-xl border border-amber-200/50 bg-gradient-to-br from-indigo-50/50 to-white p-4 shadow-sm">

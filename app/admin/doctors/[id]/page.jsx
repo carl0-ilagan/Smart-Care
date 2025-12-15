@@ -739,7 +739,7 @@ export default function AdminDoctorDetailsPage() {
                       : "bg-soft-amber text-white"
                   }`}>
                     {stats.totalPatients || 0}
-                  </span>
+                </span>
                 )}
               </button>
               </div>

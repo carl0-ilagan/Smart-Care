@@ -323,16 +323,16 @@ const MessageDisplay = ({
         {((message.type === "image" || actualFileType === "image") && message.status !== "unsent") && (
           <div className="mb-2 -mx-1">
             <div className="overflow-hidden rounded-2xl cursor-pointer group relative" onClick={openPreviewModal}>
-              <img
+            <img
                 src={
                   message.fileData?.base64 
                     ? createDataURL(message.fileData.base64, message.fileData.type || message.fileType || "image/jpeg")
                     : message.fileUrl || "/placeholder.svg"
                 }
-                alt="Image"
+              alt="Image"
                 className="max-w-full max-h-[400px] w-auto h-auto object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                loading="lazy"
-              />
+              loading="lazy"
+            />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-200"></div>
             </div>
             {message.content && message.content.trim() && (

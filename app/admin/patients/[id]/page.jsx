@@ -1029,7 +1029,7 @@ export default function AdminPatientDetailsPage() {
                 <span>Prescriptions</span>
                 {accessStatus.prescriptions !== "granted" && <Lock className="h-3 w-3 text-gray-400" />}
               </button>
-            </div>
+              </div>
             </div>
           </div>
 

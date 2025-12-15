@@ -1,8 +1,8 @@
 // Service Worker for Smart Care PWA
-const CACHE_NAME = 'smart-care-v3'
-const STATIC_CACHE = 'smart-care-static-v3'
-const DYNAMIC_CACHE = 'smart-care-dynamic-v3'
-const API_CACHE = 'smart-care-api-v3'
+const CACHE_NAME = 'smart-care-v4'
+const STATIC_CACHE = 'smart-care-static-v4'
+const DYNAMIC_CACHE = 'smart-care-dynamic-v4'
+const API_CACHE = 'smart-care-api-v4'
 
 // Static assets to cache on install (for all roles: patient, doctor, admin)
 const urlsToCache = [
@@ -27,6 +27,7 @@ const urlsToCache = [
   '/dashboard/doctors',
   '/dashboard/feedback',
   '/dashboard/calls',
+  // Patient dynamic routes will be cached on visit
   
   // Doctor pages - ALL routes
   '/doctor/dashboard',
@@ -59,6 +60,8 @@ const urlsToCache = [
   '/admin/reports',
   '/admin/roles',
   '/admin/welcome-editor',
+  '/admin/architecture',
+  '/admin/messages',
   
   // Assets
   '/SmartCare.png',
@@ -143,7 +146,17 @@ function getCacheStrategy(request) {
 
   // HTML pages - stale while revalidate for offline support
   // This includes all pages: landing, dashboard, doctor, admin, profile, etc.
-  if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+  // Enable offline caching for ALL role pages
+  if (
+    request.mode === 'navigate' || 
+    request.headers.get('accept')?.includes('text/html') ||
+    pathname.startsWith('/dashboard') ||
+    pathname.startsWith('/doctor') ||
+    pathname.startsWith('/admin') ||
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/signup'
+  ) {
     return CACHE_STRATEGIES.STALE_WHILE_REVALIDATE
   }
 
@@ -234,19 +247,39 @@ async function cacheFirst(request, cacheName) {
   }
 }
 
-// Network first strategy
+// Network first strategy - Enhanced for better offline caching
 async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName)
+  const staticCache = await caches.open(STATIC_CACHE)
+  const dynamicCache = await caches.open(DYNAMIC_CACHE)
+  
   try {
     const response = await fetch(request)
-    if (response.ok) {
+    if (response.ok && response.status === 200) {
       // Cache all successful responses (including dynamic routes)
-      cache.put(request, response.clone())
+      const url = new URL(request.url)
+      const pathname = url.pathname
+      
+      // Cache role pages in both static and dynamic for redundancy
+      if (pathname.startsWith('/dashboard') || 
+          pathname.startsWith('/doctor') || 
+          pathname.startsWith('/admin') ||
+          pathname === '/' ||
+          pathname === '/login' ||
+          pathname === '/signup') {
+        staticCache.put(request, response.clone())
+        dynamicCache.put(request, response.clone())
+      } else {
+        cache.put(request, response.clone())
+        dynamicCache.put(request, response.clone())
+      }
     }
     return response
   } catch (error) {
-    // Try exact cache match first
-    const cached = await cache.match(request)
+    // Try exact cache match first - check all caches
+    let cached = await cache.match(request) || 
+                 await staticCache.match(request) || 
+                 await dynamicCache.match(request)
     if (cached) {
       return cached
     }
@@ -320,23 +353,49 @@ async function networkFirst(request, cacheName) {
   }
 }
 
-// Stale while revalidate strategy
+// Stale while revalidate strategy - Enhanced for better offline support
 async function staleWhileRevalidate(request, cacheName) {
   const cache = await caches.open(cacheName)
-  const cached = await cache.match(request)
+  const staticCache = await caches.open(STATIC_CACHE)
+  const dynamicCache = await caches.open(DYNAMIC_CACHE)
   
-  // Fetch fresh content in background
+  // Check all caches for the request
+  let cached = await cache.match(request) || 
+               await staticCache.match(request) || 
+               await dynamicCache.match(request)
+  
+  // Fetch fresh content in background (always try to update cache)
   const fetchPromise = fetch(request).then((response) => {
-    if (response.ok) {
-      cache.put(request, response.clone())
+    if (response.ok && response.status === 200) {
+      // Cache successful responses in appropriate cache
+      const url = new URL(request.url)
+      const pathname = url.pathname
+      
+      // Determine which cache to use
+      let targetCache = dynamicCache
+      if (pathname.startsWith('/dashboard') || 
+          pathname.startsWith('/doctor') || 
+          pathname.startsWith('/admin') ||
+          pathname === '/' ||
+          pathname === '/login' ||
+          pathname === '/signup') {
+        // Cache role pages in both static and dynamic for redundancy
+        staticCache.put(request, response.clone())
+        dynamicCache.put(request, response.clone())
+      } else {
+        dynamicCache.put(request, response.clone())
+      }
     }
     return response
-  }).catch(() => {
-    // Ignore network errors for background fetch
+  }).catch((error) => {
+    // Ignore network errors for background fetch - we'll use cache
+    console.log('[SW] Background fetch failed (offline):', request.url)
   })
 
-  // Return cached version immediately if available
+  // Return cached version immediately if available (for instant offline support)
   if (cached) {
+    // Still try to update in background
+    fetchPromise.catch(() => {}) // Suppress errors
     return cached
   }
 

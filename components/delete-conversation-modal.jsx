@@ -112,7 +112,7 @@ export default function DeleteConversationModal({ isOpen, onClose, onConfirm, is
               </div>
             </div>
             <h2 className="text-2xl font-bold text-graphite text-center">Delete Conversation</h2>
-          </div>
+        </div>
 
           {/* Content */}
           <div className="p-6">
@@ -121,22 +121,22 @@ export default function DeleteConversationModal({ isOpen, onClose, onConfirm, is
             </p>
             <p className="text-sm text-drift-gray/80 text-center mb-6">
               This action cannot be undone. All messages in this conversation will be permanently deleted.
-            </p>
+          </p>
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-              <button
+            <button
                 onClick={handleClose}
                 disabled={isDeleting}
                 className="px-5 py-2.5 rounded-lg border border-earth-beige bg-white text-graphite text-sm font-medium transition-all duration-200 hover:bg-pale-stone hover:border-soft-amber disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-              <button
+            >
+              Cancel
+            </button>
+            <button
                 onClick={handleConfirm}
                 disabled={isDeleting}
                 className="px-5 py-2.5 rounded-lg bg-red-500 text-white text-sm font-medium transition-all duration-200 hover:bg-red-600 active:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm"
-              >
+            >
                 {isDeleting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -148,7 +148,7 @@ export default function DeleteConversationModal({ isOpen, onClose, onConfirm, is
                     <span>Delete Conversation</span>
                   </>
                 )}
-              </button>
+            </button>
             </div>
           </div>
         </div>
