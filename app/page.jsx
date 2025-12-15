@@ -920,15 +920,41 @@ export default function HomePage() {
             .filter(Boolean) // Remove null items
           
           // Enrich testimonials with user data (photoURL, experience, etc.)
-          const enriched = items.map((item) => {
-            return {
-              ...item,
-              // Prefer stored avatar to avoid extra Firestore reads (works on unauth/public)
-              avatarSrc: item.avatarSrc || item.userProfile || "/placeholder-user.jpg",
-              name: item.name || "Anonymous",
-              userRole: item.userRole || "patient",
-            }
-          })
+          const enriched = await Promise.all(
+            items.map(async (item) => {
+              const base = {
+                ...item,
+                avatarSrc: item.avatarSrc || item.userProfile || "/placeholder-user.jpg",
+                name: item.name || "Anonymous",
+                userRole: item.userRole || "patient",
+              }
+
+              // Try to enrich if permissions allow (e.g., when signed in); fall back silently on denial
+              if (!item.userId) return base
+              try {
+                const userDoc = await getDoc(doc(db, "users", item.userId))
+                if (userDoc.exists()) {
+                  const userData = userDoc.data() || {}
+                  const isDoctor = item.userRole === "doctor" || userData.role === "doctor"
+                  return {
+                    ...base,
+                    avatarSrc: base.avatarSrc || userData.photoURL || "/placeholder-user.jpg",
+                    name: base.name || userData.displayName || userData.name || "Anonymous",
+                    userRole: isDoctor ? "doctor" : "patient",
+                    specialty: item.specialty || userData.specialty || userData.specialization || userData.speciality || null,
+                    experience: userData.experience || null,
+                    location: userData.address || userData.location || null,
+                  }
+                }
+                return base
+              } catch (err) {
+                if (err?.code !== "permission-denied") {
+                  console.warn("Failed to enrich testimonial user data", err)
+                }
+                return base
+              }
+            })
+          )
           
           // Limit to 6 (query already does this, but ensure client-side too)
           const limitedItems = enriched.slice(0, 6)

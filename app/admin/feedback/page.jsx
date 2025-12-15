@@ -103,15 +103,38 @@ export default function AdminFeedbackPage() {
       const snapshot = await getDocs(q)
       const items = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
 
-      // Avoid permission issues: use stored testimonial fields only
-      const normalized = items.map((item) => ({
-        ...item,
-        userRole: item.userRole || "patient",
-        userName: item.userName || "User",
-        userProfile: item.userProfile || item.avatarSrc || "/placeholder-user.jpg",
-      }))
+      const enriched = await Promise.all(
+        items.map(async (item) => {
+          const base = {
+            ...item,
+            userRole: item.userRole || "patient",
+            userName: item.userName || "User",
+            userProfile: item.userProfile || item.avatarSrc || "/placeholder-user.jpg",
+          }
+          if (!item.userId) return base
+          try {
+            const userDoc = await getDoc(doc(db, "users", item.userId))
+            if (userDoc.exists()) {
+              const userData = userDoc.data() || {}
+              return {
+                ...base,
+                userRole: userData.role || base.userRole,
+                specialty: base.specialty || userData.specialty || userData.specialization || userData.speciality || null,
+                userName: base.userName || userData.displayName || userData.name || "User",
+                userProfile: base.userProfile || userData.photoURL || "/placeholder-user.jpg",
+              }
+            }
+            return base
+          } catch (err) {
+            if (err?.code !== "permission-denied") {
+              console.warn("Failed to enrich testimonial user data", err)
+            }
+            return base
+          }
+        })
+      )
 
-      setTestimonials(normalized)
+      setTestimonials(enriched)
     } catch (error) {
       if (error?.code === "permission-denied") {
         console.warn("Testimonials load blocked by permissions; showing none.")
