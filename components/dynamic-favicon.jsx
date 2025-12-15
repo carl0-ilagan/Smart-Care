@@ -53,6 +53,14 @@ export function DynamicFavicon() {
           if (faviconUrl) {
             console.log("[DynamicFavicon] Updating favicon to:", faviconUrl)
             updateFavicon(faviconUrl)
+            
+            // Inform service worker about new PWA icon for manifest/app icon
+            if (navigator.serviceWorker?.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: "PWA_ICON_UPDATE",
+                iconUrl: faviconUrl,
+              })
+            }
           } else {
             // Fallback to default if no favicon URL in database
             updateFavicon(defaultFavicon)

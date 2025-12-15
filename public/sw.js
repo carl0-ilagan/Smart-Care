@@ -4,6 +4,9 @@ const STATIC_CACHE = 'smart-care-static-v5'
 const DYNAMIC_CACHE = 'smart-care-dynamic-v5'
 const API_CACHE = 'smart-care-api-v5'
 
+// Runtime branding icon (sent from client when admin changes logo)
+let latestBrandingIcon = null
+
 // Static assets to cache on install (for all roles: patient, doctor, admin)
 const urlsToCache = [
   // Landing page and public pages
@@ -161,6 +164,11 @@ function getCacheStrategy(request) {
 
   // Next.js data routes - cache first with fallback to page HTML
   if (pathname.startsWith('/_next/data/')) {
+    return CACHE_STRATEGIES.CACHE_FIRST
+  }
+
+  // Manifest can be served cache-first as we return dynamic content
+  if (pathname === '/manifest.json') {
     return CACHE_STRATEGIES.CACHE_FIRST
   }
 
@@ -517,6 +525,53 @@ self.addEventListener('fetch', (event) => {
 
   const pathname = url.pathname
 
+  // Serve manifest dynamically with latest branding icon
+  if (pathname === '/manifest.json') {
+    event.respondWith(
+      (async () => {
+        const iconUrl = latestBrandingIcon || '/SmartCare.png'
+        const ts = Date.now()
+        const manifest = {
+          name: 'Smart Care - Healthcare Platform',
+          short_name: 'Smart Care',
+          description: 'A modern telehealth platform for all your healthcare needs',
+          start_url: '/',
+          display: 'standalone',
+          background_color: '#f5f3f0',
+          theme_color: '#f59e0b',
+          orientation: 'portrait-primary',
+          icons: [
+            { src: `${iconUrl}?t=${ts}&size=192`, sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+            { src: `${iconUrl}?t=${ts}&size=512`, sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+          ],
+          categories: ['healthcare', 'medical', 'productivity'],
+          screenshots: [],
+          shortcuts: [
+            { name: 'Book Appointment', short_name: 'Book', description: 'Book a new appointment with a doctor', url: '/dashboard/appointments/new', icons: [{ src: `${iconUrl}?t=${ts}&size=96`, sizes: '96x96' }] },
+            { name: 'Messages', short_name: 'Messages', description: 'View your messages', url: '/dashboard/messages', icons: [{ src: `${iconUrl}?t=${ts}&size=96`, sizes: '96x96' }] },
+            { name: 'Prescriptions', short_name: 'Prescriptions', description: 'View your prescriptions', url: '/dashboard/prescriptions', icons: [{ src: `${iconUrl}?t=${ts}&size=96`, sizes: '96x96' }] },
+          ],
+          share_target: {
+            action: '/share',
+            method: 'POST',
+            enctype: 'multipart/form-data',
+            params: {
+              title: 'title',
+              text: 'text',
+              url: 'url',
+              files: [{ name: 'files', accept: ['image/*', 'application/pdf'] }],
+            },
+          },
+        }
+        return new Response(JSON.stringify(manifest), {
+          status: 200,
+          headers: { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-store' },
+        })
+      })()
+    )
+    return
+  }
+
   // Handle Next.js data routes explicitly so we can give offline fallbacks
   if (pathname.startsWith('/_next/data/')) {
     const dataRequest = event.request
@@ -715,6 +770,11 @@ self.addEventListener('message', (event) => {
     }).catch((error) => {
       console.error('Error showing notification:', error)
     })
+  }
+  
+  // Update branding icon for manifest
+  if (event.data && event.data.type === 'PWA_ICON_UPDATE') {
+    latestBrandingIcon = event.data.iconUrl || null
   }
   
   // Handle pre-cache requests for specific pages
