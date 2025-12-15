@@ -216,11 +216,13 @@ export default function RoomPage({ params }) {
             hasShownEndedToastRef.current = true
           }
           if (typeof window !== "undefined") {
-            if (userRole === "doctor") {
-              window.location.href = "/doctor/dashboard"
-            } else {
-              window.location.href = "/dashboard"
-            }
+            setTimeout(() => {
+              if (userRole === "doctor") {
+                window.location.assign("/doctor/dashboard")
+              } else {
+                window.location.assign("/dashboard")
+              }
+            }, 150)
           }
           return
         }
@@ -368,7 +370,9 @@ export default function RoomPage({ params }) {
             try { if (pcRef.current) pcRef.current.close() } catch {}
             try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t)=>t.stop()) } catch {}
             if (typeof window !== "undefined") {
-              window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
+              setTimeout(() => {
+                window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
+              }, 150)
             }
             return
           }
@@ -657,8 +661,18 @@ export default function RoomPage({ params }) {
       try { if (pcRef.current) pcRef.current.close() } catch {}
       try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t) => t.stop()) } catch {}
       if (typeof window !== "undefined") {
-        // Redirect both doctor and patient to their respective dashboards when call is ended
-        window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
+        // Notify once and redirect both doctor and patient to their respective dashboards when call is ended
+        if (!hasShownEndedToastRef.current) {
+          toast({
+            title: "Room already ended",
+            description: "The call has been closed.",
+            variant: "destructive",
+          })
+          hasShownEndedToastRef.current = true
+        }
+        setTimeout(() => {
+          window.location.assign(userRole === "doctor" ? "/doctor/dashboard" : "/dashboard")
+        }, 150)
       }
     }
   }
