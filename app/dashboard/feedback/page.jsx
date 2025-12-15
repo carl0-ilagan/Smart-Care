@@ -45,30 +45,15 @@ export default function PatientFeedbackPage() {
         const snapshot = await getDocs(q)
         const items = snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
 
-        // Enrich testimonials with global user context (role + specialty if doctor)
-        const enriched = await Promise.all(
-          items.map(async (item) => {
-            try {
-              if (!item.userId) return { ...item }
-              const userDoc = await getDoc(doc(db, "users", item.userId))
-              if (!userDoc.exists()) return { ...item }
+        // Avoid permission issues: use stored testimonial fields only
+        const normalized = items.map((item) => ({
+          ...item,
+          userRole: item.userRole || "patient",
+          userName: item.userName || "User",
+          userProfile: item.userProfile || item.avatarSrc || "/placeholder-user.jpg",
+        }))
 
-              const userData = userDoc.data() || {}
-              return {
-                ...item,
-                userRole: userData.role || item.userRole || "patient",
-                specialty: userData.specialty || userData.specialization || userData.speciality || null,
-                userName: item.userName || userData.displayName || userData.name || "User",
-                userProfile: item.userProfile || userData.photoURL || null,
-              }
-            } catch (err) {
-              console.warn("Failed to enrich testimonial user data", err)
-              return { ...item }
-            }
-          })
-        )
-
-        setTestimonials(enriched)
+        setTestimonials(normalized)
       } catch (error) {
         if (error?.code === "permission-denied") {
           console.warn("Testimonials load blocked by permissions; showing none.")

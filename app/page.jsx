@@ -920,37 +920,15 @@ export default function HomePage() {
             .filter(Boolean) // Remove null items
           
           // Enrich testimonials with user data (photoURL, experience, etc.)
-          const enriched = await Promise.all(
-            items.map(async (item) => {
-              try {
-                if (item.userId) {
-                  const userDoc = await getDoc(doc(db, "users", item.userId))
-                  if (userDoc.exists()) {
-                    const userData = userDoc.data() || {}
-                    const isDoctor = item.userRole === "doctor" || userData.role === "doctor"
-                    return {
-                      ...item,
-                      avatarSrc: item.avatarSrc || userData.photoURL || null,
-                      name: item.name || userData.displayName || userData.name || "Anonymous",
-                      userRole: isDoctor ? "doctor" : "patient",
-                      specialty: item.specialty || userData.specialty || userData.specialization || userData.speciality || null,
-                      experience: userData.experience || null,
-                      location: userData.address || userData.location || null,
-                      createdAt: item.createdAt || null,
-                    }
-                  }
-                }
-                return item
-              } catch (err) {
-                if (err?.code === "permission-denied") {
-                  // Public landing view may not have permission to read users; fall back to stored testimonial fields
-                  return item
-                }
-                console.warn("Failed to enrich testimonial user data", err)
-                return item
-              }
-            })
-          )
+          const enriched = items.map((item) => {
+            return {
+              ...item,
+              // Prefer stored avatar to avoid extra Firestore reads (works on unauth/public)
+              avatarSrc: item.avatarSrc || item.userProfile || "/placeholder-user.jpg",
+              name: item.name || "Anonymous",
+              userRole: item.userRole || "patient",
+            }
+          })
           
           // Limit to 6 (query already does this, but ensure client-side too)
           const limitedItems = enriched.slice(0, 6)
