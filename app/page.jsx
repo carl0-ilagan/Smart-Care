@@ -1416,7 +1416,7 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <div className="pt-4">
+              <div className="pt-4 flex justify-center sm:justify-start">
                 <button
                   onClick={() => setShowSignupModal(true)}
                   className="group inline-flex h-14 items-center justify-center rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 px-8 text-base font-semibold text-white transition-all hover:from-amber-600 hover:to-amber-500 hover:shadow-2xl hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 transform duration-300"

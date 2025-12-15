@@ -1,8 +1,8 @@
 // Service Worker for Smart Care PWA
-const CACHE_NAME = 'smart-care-v4'
-const STATIC_CACHE = 'smart-care-static-v4'
-const DYNAMIC_CACHE = 'smart-care-dynamic-v4'
-const API_CACHE = 'smart-care-api-v4'
+const CACHE_NAME = 'smart-care-v5'
+const STATIC_CACHE = 'smart-care-static-v5'
+const DYNAMIC_CACHE = 'smart-care-dynamic-v5'
+const API_CACHE = 'smart-care-api-v5'
 
 // Static assets to cache on install (for all roles: patient, doctor, admin)
 const urlsToCache = [
@@ -126,6 +126,26 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim()
 })
 
+// Helper: map Next.js data route to its page HTML (for offline fallback)
+function mapDataRouteToPage(pathname) {
+  // Example: /_next/data/<build-id>/doctor/dashboard.json -> /doctor/dashboard
+  try {
+    const parts = pathname.split('/').filter(Boolean) // ["_next","data","<build>","doctor","dashboard.json"]
+    if (parts.length >= 4 && parts[0] === '_next' && parts[1] === 'data') {
+      const pageParts = parts.slice(3)
+      if (pageParts.length === 1 && pageParts[0] === 'index.json') return '/'
+      const last = pageParts[pageParts.length - 1]
+      if (last && last.endsWith('.json')) {
+        pageParts[pageParts.length - 1] = last.replace(/\.json$/, '')
+      }
+      return '/' + pageParts.join('/')
+    }
+  } catch (e) {
+    // no-op
+  }
+  return null
+}
+
 // Helper function to determine cache strategy based on request type
 function getCacheStrategy(request) {
   const url = new URL(request.url)
@@ -136,6 +156,11 @@ function getCacheStrategy(request) {
     pathname.match(/\.(jpg|jpeg|png|gif|svg|webp|ico|woff|woff2|ttf|eot)$/i) ||
     pathname.startsWith('/_next/static/')
   ) {
+    return CACHE_STRATEGIES.CACHE_FIRST
+  }
+
+  // Next.js data routes - cache first with fallback to page HTML
+  if (pathname.startsWith('/_next/data/')) {
     return CACHE_STRATEGIES.CACHE_FIRST
   }
 
@@ -490,8 +515,49 @@ self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests (except for same origin)
   if (!url.origin || url.origin !== self.location.origin) return
 
-  // Skip ALL Next.js internal routes - CRITICAL: Don't intercept these at all
   const pathname = url.pathname
+
+  // Handle Next.js data routes explicitly so we can give offline fallbacks
+  if (pathname.startsWith('/_next/data/')) {
+    const dataRequest = event.request
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(DYNAMIC_CACHE)
+        const pagePath = mapDataRouteToPage(pathname)
+
+        // Serve cache if available
+        const cached = await cache.match(dataRequest)
+        if (cached) {
+          // Refresh in background
+          fetch(dataRequest).then((res) => {
+            if (res.ok) cache.put(dataRequest, res.clone())
+          }).catch(() => {})
+          return cached
+        }
+
+        // Try network then cache
+        try {
+          const res = await fetch(dataRequest)
+          if (res.ok) {
+            cache.put(dataRequest, res.clone())
+          }
+          return res
+        } catch (err) {
+          // Offline fallback to corresponding HTML page
+          if (pagePath) {
+            const staticCache = await caches.open(STATIC_CACHE)
+            const dynamicCache = await caches.open(DYNAMIC_CACHE)
+            const fallbackPage = await staticCache.match(pagePath) || await dynamicCache.match(pagePath) || await staticCache.match('/') || await dynamicCache.match('/')
+            if (fallbackPage) return fallbackPage
+          }
+          return new Response('Offline - data unavailable', { status: 200, headers: { 'Content-Type': 'text/plain' } })
+        }
+      })()
+    )
+    return
+  }
+
+  // Skip other internal Next.js/internal routes
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/_next') ||
@@ -504,7 +570,7 @@ self.addEventListener('fetch', (event) => {
     event.request.headers.get('next-router-prefetch') !== null ||
     event.request.headers.get('next-router-state-tree') !== null
   ) {
-    return // CRITICAL: Let Next.js handle its own routes - no service worker interference
+    return // Let Next.js handle its own routes
   }
 
   // Determine cache strategy

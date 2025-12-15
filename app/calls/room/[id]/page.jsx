@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, use as unwrap } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/components/ui/use-toast"
 import { db } from "@/lib/firebase"
 import {
   doc,
@@ -27,6 +28,7 @@ export default function RoomPage({ params }) {
   // Next.js newer params may be a Promise; unwrap safely
   const { id: callId } = unwrap(params)
   const { user, userRole } = useAuth()
+  const { toast } = useToast()
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
   const pcRef = useRef(null)
@@ -49,6 +51,8 @@ export default function RoomPage({ params }) {
   const [upcomingAppointments, setUpcomingAppointments] = useState([])
   const [invitedPatients, setInvitedPatients] = useState(new Set())
   const [invitationSent, setInvitationSent] = useState(null) // Store {patientId, patientName} when invitation is sent
+  const [showEndModal, setShowEndModal] = useState(false)
+  const hasShownEndedToastRef = useRef(false)
 
   const configuration = {
     iceServers: [
@@ -203,6 +207,14 @@ export default function RoomPage({ params }) {
         // Check if room is ended or inactive - redirect to dashboard if so (prevent joining)
         if (callData.status === "ended" || callData.status === "cancelled" || callData.status === "closed" || callData.revokedBy) {
           console.log("❌ Room is ended/inactive, cannot join. Redirecting to dashboard...")
+          if (!hasShownEndedToastRef.current) {
+            toast({
+              title: "Room already ended",
+              description: "This room is no longer available.",
+              variant: "destructive",
+            })
+            hasShownEndedToastRef.current = true
+          }
           if (typeof window !== "undefined") {
             if (userRole === "doctor") {
               window.location.href = "/doctor/dashboard"
@@ -345,6 +357,14 @@ export default function RoomPage({ params }) {
           // Check if room was ended - redirect to dashboard if so
           if (d.status === "ended" || d.status === "cancelled" || d.status === "closed") {
             console.log("❌ Room was ended, redirecting to dashboard...")
+            if (!hasShownEndedToastRef.current) {
+              toast({
+                title: "Room already ended",
+                description: "The call has been closed.",
+                variant: "destructive",
+              })
+              hasShownEndedToastRef.current = true
+            }
             try { if (pcRef.current) pcRef.current.close() } catch {}
             try { if (localStreamRef.current) localStreamRef.current.getTracks().forEach((t)=>t.stop()) } catch {}
             if (typeof window !== "undefined") {
@@ -643,6 +663,16 @@ export default function RoomPage({ params }) {
     }
   }
 
+  const handleConfirmEndRoom = () => {
+    setShowEndModal(false)
+    revokeRoom()
+  }
+
+  const handleCancelEndRoom = () => {
+    if (isRevoking) return
+    setShowEndModal(false)
+  }
+
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#0b0f14] text-white" ref={stageRef}>
       {/* Top bar */}
@@ -680,8 +710,7 @@ export default function RoomPage({ params }) {
             <button
               onClick={() => {
                 if (isRevoking) return
-                const ok = typeof window !== "undefined" ? window.confirm("End this room for everyone?") : true
-                if (ok) revokeRoom()
+                setShowEndModal(true)
               }}
               disabled={isRevoking}
               className={`rounded-md px-2.5 sm:px-3 py-1.5 text-xs font-semibold shadow transition ${isRevoking ? "bg-red-400 text-white cursor-not-allowed" : "bg-red-500 text-white hover:bg-red-600"}`}
@@ -1009,6 +1038,36 @@ export default function RoomPage({ params }) {
             </div>
           </div>
         </>
+      )}
+      {showEndModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white text-graphite shadow-2xl">
+            <div className="border-b border-pale-stone px-6 py-4">
+              <h3 className="text-lg font-bold">End Room</h3>
+              <p className="text-sm text-drift-gray mt-1">This will end the room for everyone.</p>
+            </div>
+            <div className="px-6 py-5 space-y-3 text-sm text-drift-gray">
+              <p>All participants will be removed and redirected to their dashboards.</p>
+              <p className="font-semibold text-graphite">Continue?</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 border-t border-pale-stone px-6 py-4">
+              <button
+                onClick={handleCancelEndRoom}
+                disabled={isRevoking}
+                className="flex-1 rounded-lg border border-earth-beige bg-white px-4 py-2.5 text-sm font-semibold text-graphite hover:bg-pale-stone transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmEndRoom}
+                disabled={isRevoking}
+                className="flex-1 rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isRevoking ? "Ending…" : "End Room"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
